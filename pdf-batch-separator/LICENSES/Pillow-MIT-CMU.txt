@@ -1,0 +1,4 @@
+pillow 12.3.0
+=============
+
+Declared licence: MIT-CMU

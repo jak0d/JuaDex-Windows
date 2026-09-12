@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.venv/
+venv/
+
+# Build artefacts
+build/
+dist/
+*.spec.bak
+pdf-batch-separator/build/
+pdf-batch-separator/dist/
+pdf-batch-separator/installer_output/
+
+# Generated fixtures / scratch output
+pdf-batch-separator/tests/fixtures/generated/
+pdf-batch-separator/SHA256SUMS-*.txt
+pdf-batch-separator/*-portable.zip
