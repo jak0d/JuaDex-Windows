@@ -12,7 +12,21 @@ Everything happens on the local machine. There is no server, no cloud account,
 no browser, and no internet connection required — and no Python, Poppler, ZBar
 or Tesseract for the end user to install.
 
-![Main window](docs/screenshot-main.png)
+![Main window — the redesigned light theme](docs/screenshot-main.png)
+
+The redesigned interface keeps the whole workflow on one screen: choose the
+mode, adjust the settings, pick the output folder, and watch every file's
+status in the batch table. A one-click toggle switches between the light and
+dark appearance.
+
+<details>
+<summary>More screenshots — dark mode and the page review dialog</summary>
+
+![Main window in dark mode](docs/screenshot-dark.png)
+
+![Page review dialog with per-page thumbnails](docs/screenshot-review.png)
+
+</details>
 
 ---
 
@@ -291,7 +305,8 @@ pdf-batch-separator/
 │   └── ui/
 │       ├── main_window.py
 │       ├── batch_model.py
-│       └── document_review.py
+│       ├── document_review.py
+│       └── theme.py            # light/dark visual system
 ├── tests/                      # 233 automated tests
 ├── packaging/
 │   ├── app.spec                # PyInstaller
