@@ -10,9 +10,8 @@ import logging
 from datetime import datetime
 from pathlib import Path
 
-from PySide6.QtCore import QThread, QTimer, Qt, Signal, Slot
+from PySide6.QtCore import QThread, QTimer, Qt, QUrl, Signal, Slot
 from PySide6.QtGui import QDesktopServices, QGuiApplication, QKeySequence
-from PySide6.QtCore import QUrl
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QButtonGroup,
@@ -20,7 +19,6 @@ from PySide6.QtWidgets import (
     QComboBox,
     QDialog,
     QFileDialog,
-    QGroupBox,
     QHBoxLayout,
     QHeaderView,
     QLabel,
@@ -28,8 +26,8 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QMessageBox,
     QProgressBar,
-    QPushButton,
     QRadioButton,
+    QScrollArea,
     QSizePolicy,
     QSplitter,
     QTableView,
@@ -55,9 +53,12 @@ from ..core.report import build_report, write_report
 from ..core.separator_pdf import SeparatorGenerationError, create_separator_pdf
 from ..settings import AppSettings, SettingsStore
 from ..workers import AnalysisWorker, ExportWorker
+from . import components as ui
+from . import icons
+from .batch_delegate import ROW_HEIGHT, BatchRowDelegate
 from .batch_model import BatchRow, BatchTableModel, RowState
 from .document_review import DocumentReviewDialog
-from .theme import apply_theme
+from .theme import SPACE, apply_theme, color
 
 logger = logging.getLogger(__name__)
 
@@ -65,9 +66,14 @@ PRIVACY_TEXT = "Your PDFs are processed only on this PC."
 
 
 class DropTableView(QTableView):
-    """Table view that accepts dropped PDFs and folders."""
+    """Table view that accepts dropped PDFs and folders.
+
+    ``hover_changed`` lets the window highlight the empty-state drop zone while
+    a drag is in flight, so the target is obvious before the user releases.
+    """
 
     files_dropped = Signal(list)
+    hover_changed = Signal(bool)
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -76,13 +82,19 @@ class DropTableView(QTableView):
 
     def dragEnterEvent(self, event):  # noqa: N802
         if event.mimeData().hasUrls():
+            self.hover_changed.emit(True)
             event.acceptProposedAction()
 
     def dragMoveEvent(self, event):  # noqa: N802
         if event.mimeData().hasUrls():
             event.acceptProposedAction()
 
+    def dragLeaveEvent(self, event):  # noqa: N802
+        self.hover_changed.emit(False)
+        super().dragLeaveEvent(event)
+
     def dropEvent(self, event):  # noqa: N802
+        self.hover_changed.emit(False)
         urls = event.mimeData().urls()
         paths = [Path(url.toLocalFile()) for url in urls if url.isLocalFile()]
         if paths:
@@ -135,108 +147,224 @@ class MainWindow(QMainWindow):
         central = QWidget()
         self.setCentralWidget(central)
         root = QVBoxLayout(central)
-        root.setContentsMargins(12, 10, 12, 10)
-        root.setSpacing(8)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(0)
 
-        root.addWidget(self._build_header())
+        root.addWidget(self._build_app_bar())
+        root.addWidget(self._build_page_header())
 
-        splitter = QSplitter(Qt.Orientation.Horizontal)
-        splitter.addWidget(self._build_left_panel())
-        splitter.addWidget(self._build_right_panel())
-        splitter.setStretchFactor(0, 0)
-        splitter.setStretchFactor(1, 1)
-        splitter.setSizes([310, 870])
-        splitter.setChildrenCollapsible(False)
-        root.addWidget(splitter, 1)
+        body = QWidget()
+        body_layout = QHBoxLayout(body)
+        body_layout.setContentsMargins(SPACE["lg"], SPACE["md"], SPACE["lg"], SPACE["md"])
+        body_layout.setSpacing(0)
 
-        root.addWidget(self._build_footer())
+        self.splitter = QSplitter(Qt.Orientation.Horizontal)
+        self.splitter.addWidget(self._build_sidebar())
+        self.splitter.addWidget(self._build_workspace())
+        self.splitter.setStretchFactor(0, 0)
+        self.splitter.setStretchFactor(1, 1)
+        self.splitter.setSizes([352, 900])
+        self.splitter.setChildrenCollapsible(False)
+        self.splitter.setHandleWidth(SPACE["lg"])
+        body_layout.addWidget(self.splitter)
+        root.addWidget(body, 1)
+
+        root.addWidget(self._build_action_bar())
         self.statusBar().showMessage(PRIVACY_TEXT)
 
-    def _build_header(self) -> QWidget:
-        header = QWidget()
-        layout = QHBoxLayout(header)
-        layout.setContentsMargins(0, 0, 0, 0)
+    # -- chrome ---------------------------------------------------------
+    def _build_app_bar(self) -> QWidget:
+        """Top bar: brand, offline assurance, batch identity and utilities."""
 
-        title = QLabel("PDF Batch Separator")
-        title.setObjectName("appTitle")
-        title.setStyleSheet("font-size: 18pt; font-weight: 700; letter-spacing: 0.2px;")
-        layout.addWidget(title)
+        bar = QWidget()
+        bar.setObjectName("appBar")
+        bar.setFixedHeight(58)
+        layout = QHBoxLayout(bar)
+        layout.setContentsMargins(SPACE["lg"], SPACE["sm"], SPACE["lg"], SPACE["sm"])
+        layout.setSpacing(SPACE["md"])
 
-        subtitle = QLabel("Prepare, review, and export scanned documents")
-        subtitle.setStyleSheet("color: #64748B; margin-left: 2px;")
-        layout.addWidget(subtitle)
+        self.brand_mark = ui.BrandMark(30)
+        layout.addWidget(self.brand_mark)
+        self.wordmark = ui.label("JuaDex", "wordmark")
+        layout.addWidget(self.wordmark)
 
-        badge = QLabel("\U0001f512  Offline \u2014 " + PRIVACY_TEXT)
-        badge.setStyleSheet(
-            "padding: 3px 10px; border-radius: 9px;"
-            " background: rgba(15,123,15,0.12); color: #0f7b0f; font-weight: 600;"
-        )
-        badge.setAccessibleName(
+        self.version_pill = ui.Pill(f"v{__version__}", "neutral", mono=True)
+        self.version_pill.setToolTip(f"PDF Batch Separator {__version__}")
+        layout.addWidget(self.version_pill)
+
+        layout.addSpacing(SPACE["sm"])
+        layout.addWidget(ui.divider(Qt.Orientation.Vertical))
+        layout.addSpacing(SPACE["sm"])
+
+        # The privacy promise is the product's core claim, so it lives in the
+        # chrome rather than buried in an About box.
+        self.offline_badge = ui.Pill("100% LOCAL", "success", uppercase=True)
+        self.offline_badge.setToolTip(PRIVACY_TEXT)
+        self.offline_badge.setAccessibleName(
             "Privacy notice: this application works offline. " + PRIVACY_TEXT
         )
-        layout.addSpacing(14)
-        layout.addWidget(badge)
+        layout.addWidget(self.offline_badge)
+
+        self.batch_pill = ui.Pill("NO BATCH LOADED", "neutral", mono=True)
+        self.batch_pill.setToolTip("Files currently queued in this batch")
+        layout.addWidget(self.batch_pill)
+
         layout.addStretch(1)
 
-        self.theme_button = QPushButton("Dark mode")
-        self.theme_button.setCheckable(True)
-        self.theme_button.setToolTip("Switch between light and dark appearance")
+        self.theme_button = ui.icon_button(
+            "moon", "Switch between light and dark appearance", checkable=True
+        )
         self.theme_button.setShortcut(QKeySequence("Ctrl+Shift+D"))
         self.theme_button.toggled.connect(self._toggle_theme)
         layout.addWidget(self.theme_button)
 
-        self.help_button = QPushButton("Help / About")
-        self.help_button.setToolTip("Version, privacy and licence information (F1)")
+        self.help_button = ui.icon_button(
+            "help-circle", "Version, privacy and licence information (F1)"
+        )
         self.help_button.setShortcut(QKeySequence(Qt.Key.Key_F1))
         self.help_button.clicked.connect(self._show_about)
         layout.addWidget(self.help_button)
+
+        bar.setStyleSheet(
+            f"QWidget#appBar {{ background: {color('surface')};"
+            f" border-bottom: 1px solid {color('line')}; }}"
+        )
+        return bar
+
+    def _build_page_header(self) -> QWidget:
+        """Batch title, live metrics and the keyboard-shortcut card."""
+
+        header = QWidget()
+        header.setObjectName("pageHeader")
+        layout = QHBoxLayout(header)
+        layout.setContentsMargins(SPACE["lg"], SPACE["lg"], SPACE["lg"], SPACE["sm"])
+        layout.setSpacing(SPACE["xl"])
+
+        left = QVBoxLayout()
+        left.setSpacing(SPACE["sm"])
+
+        self.mode_eyebrow = ui.SectionHeader("Page separation", icon_name="scissors")
+        left.addWidget(self.mode_eyebrow)
+
+        self.batch_title = ui.label("Scanning Separation & Blank Cleanup", "display")
+        self.batch_title.setWordWrap(True)
+        left.addWidget(self.batch_title)
+
+        stats = QHBoxLayout()
+        stats.setSpacing(SPACE["lg"])
+        self.stat_total = ui.StatChip("0", "Total Pages", "info")
+        self.stat_separators = ui.StatChip("0", "Separator Sheets", "separator")
+        self.stat_blanks = ui.StatChip("0", "Blank Pages", "warning")
+        self.stat_content = ui.StatChip("0", "Documents Out", "success")
+        for chip in (
+            self.stat_total,
+            self.stat_separators,
+            self.stat_blanks,
+            self.stat_content,
+        ):
+            stats.addWidget(chip)
+        stats.addStretch(1)
+        left.addLayout(stats)
+        layout.addLayout(left, 1)
+
+        layout.addWidget(self._build_shortcut_card(), 0, Qt.AlignmentFlag.AlignTop)
         return header
 
-    def _build_left_panel(self) -> QWidget:
+    def _build_shortcut_card(self) -> QWidget:
+        """A compact legend of the keyboard accelerators."""
+
+        card = ui.Card(padding=SPACE["md"], spacing=SPACE["sm"])
+        card.setMaximumWidth(340)
+
+        row = QHBoxLayout()
+        row.setSpacing(SPACE["sm"])
+        for keys, text in (("F5", "Analyse"), ("Ctrl+\u21b5", "Process")):
+            row.addWidget(ui.KeyHint(keys))
+            caption = ui.label(text, "subtle")
+            row.addWidget(caption)
+            row.addSpacing(SPACE["xs"])
+        row.addStretch(1)
+        card.body.addLayout(row)
+
+        row2 = QHBoxLayout()
+        row2.setSpacing(SPACE["sm"])
+        row2.addWidget(ui.KeyHint("Del"))
+        row2.addWidget(ui.label("Remove file", "subtle"))
+        row2.addSpacing(SPACE["xs"])
+        row2.addWidget(ui.KeyHint("Enter"))
+        row2.addWidget(ui.label("Review pages", "subtle"))
+        row2.addStretch(1)
+        card.body.addLayout(row2)
+        return card
+
+    # -- sidebar --------------------------------------------------------
+    def _build_sidebar(self) -> QWidget:
+        """The configuration column: mode, detection settings, destination."""
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setMinimumWidth(330)
+        scroll.setMaximumWidth(430)
+
         panel = QWidget()
         layout = QVBoxLayout(panel)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(12)
+        layout.setContentsMargins(0, 0, SPACE["xs"], 0)
+        layout.setSpacing(SPACE["md"])
 
-        # -- mode -----------------------------------------------------
-        mode_box = QGroupBox("1. What do you want to do?")
-        mode_layout = QVBoxLayout(mode_box)
-        mode_layout.setSpacing(10)
+        layout.addWidget(self._build_mode_card())
+        layout.addWidget(self._build_settings_card())
+        layout.addWidget(self._build_output_card())
+        layout.addStretch(1)
+
+        scroll.setWidget(panel)
+        scroll.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
+        return scroll
+
+    def _build_mode_card(self) -> QWidget:
+        card = ui.Card()
+        card.body.addWidget(ui.SectionHeader("1 · What do you want to do?", icon_name="sliders"))
 
         self.mode_group = QButtonGroup(self)
 
         self.split_radio = QRadioButton("Split by separator")
-        self.split_radio.setStyleSheet("font-weight: 600;")
-        split_hint = QLabel(
+        self.split_radio.setStyleSheet("font-weight: 700;")
+        split_hint = ui.label(
             "Find the barcode separator sheets, remove them, and save each "
-            "document between them as its own PDF."
+            "document between them as its own PDF.",
+            "muted",
         )
         split_hint.setWordWrap(True)
-        split_hint.setContentsMargins(24, 0, 0, 6)
+        split_hint.setContentsMargins(25, 0, 0, 0)
 
         self.clean_radio = QRadioButton("Remove blank pages only")
-        self.clean_radio.setStyleSheet("font-weight: 600;")
-        clean_hint = QLabel(
+        self.clean_radio.setStyleSheet("font-weight: 700;")
+        clean_hint = ui.label(
             "Keep each PDF as one document and only remove the blank pages, "
-            "such as empty backsides."
+            "such as empty backsides.",
+            "muted",
         )
         clean_hint.setWordWrap(True)
-        clean_hint.setContentsMargins(24, 0, 0, 0)
+        clean_hint.setContentsMargins(25, 0, 0, 0)
 
         self.mode_group.addButton(self.split_radio, 0)
         self.mode_group.addButton(self.clean_radio, 1)
-        for widget in (self.split_radio, split_hint, self.clean_radio, clean_hint):
-            mode_layout.addWidget(widget)
+
+        card.body.addWidget(self.split_radio)
+        card.body.addWidget(split_hint)
+        card.body.addSpacing(SPACE["xs"])
+        card.body.addWidget(self.clean_radio)
+        card.body.addWidget(clean_hint)
         self.mode_group.idToggled.connect(self._on_mode_changed)
-        layout.addWidget(mode_box)
+        return card
 
-        # -- settings -------------------------------------------------
-        self.settings_box = QGroupBox("2. Settings")
-        settings_layout = QVBoxLayout(self.settings_box)
-        settings_layout.setSpacing(8)
+    def _build_settings_card(self) -> QWidget:
+        self.settings_box = ui.Card()
+        body = self.settings_box.body
+        body.addWidget(ui.SectionHeader("2 · Detection settings", icon_name="barcode"))
 
-        self.separator_label = QLabel("Separator barcode value")
-        settings_layout.addWidget(self.separator_label)
+        self.separator_label = ui.label("Separator barcode value", "muted")
+        body.addWidget(self.separator_label)
 
         self.separator_combo = QComboBox()
         self.separator_combo.setEditable(False)
@@ -245,214 +373,293 @@ class MainWindow(QMainWindow):
         self.separator_combo.addItem("Custom value\u2026", "")
         self.separator_combo.setAccessibleName("Separator barcode preset")
         self.separator_combo.currentIndexChanged.connect(self._on_preset_changed)
-        settings_layout.addWidget(self.separator_combo)
+        body.addWidget(self.separator_combo)
 
         self.separator_edit = QLineEdit()
         self.separator_edit.setMaxLength(128)
+        self.separator_edit.setProperty("variant", "path")
         self.separator_edit.setPlaceholderText("Enter the exact barcode text")
         self.separator_edit.setAccessibleName("Custom separator barcode value")
         self.separator_edit.textChanged.connect(self._on_separator_text_changed)
-        settings_layout.addWidget(self.separator_edit)
+        body.addWidget(self.separator_edit)
 
-        self.separator_error = QLabel()
+        self.separator_error = ui.label("", "error")
         self.separator_error.setWordWrap(True)
-        self.separator_error.setStyleSheet("color: #c42b1c;")
         self.separator_error.setVisible(False)
-        settings_layout.addWidget(self.separator_error)
+        body.addWidget(self.separator_error)
 
-        self.print_button = QPushButton("Create printable separator sheet\u2026")
-        self.print_button.setToolTip(
-            "Save an A4 PDF with this barcode that you can print and use as a separator."
+        self.print_button = ui.text_button(
+            "Create printable separator sheet\u2026",
+            icon_name="printer",
+            tooltip="Save an A4 PDF with this barcode that you can print and use as a separator.",
         )
         self.print_button.clicked.connect(self._create_separator_sheet)
-        settings_layout.addWidget(self.print_button)
+        body.addWidget(self.print_button)
 
-        settings_layout.addSpacing(6)
+        body.addSpacing(SPACE["xs"])
+        body.addWidget(ui.divider())
+        body.addSpacing(SPACE["xs"])
+
         self.blank_check = QCheckBox("Also remove blank pages")
+        self.blank_check.setStyleSheet("font-weight: 600;")
         self.blank_check.toggled.connect(self._on_blank_toggled)
-        settings_layout.addWidget(self.blank_check)
+        body.addWidget(self.blank_check)
 
-        self.sensitivity_label = QLabel("Blank page sensitivity")
-        settings_layout.addWidget(self.sensitivity_label)
+        self.sensitivity_label = ui.label("Blank page sensitivity", "muted")
+        body.addWidget(self.sensitivity_label)
+
         self.sensitivity_combo = QComboBox()
         for level in BlankSensitivity:
             self.sensitivity_combo.addItem(level.label, level.value)
         self.sensitivity_combo.setAccessibleName("Blank page sensitivity")
         self.sensitivity_combo.currentIndexChanged.connect(self._on_sensitivity_changed)
-        settings_layout.addWidget(self.sensitivity_combo)
+        body.addWidget(self.sensitivity_combo)
 
-        self.sensitivity_hint = QLabel()
+        self.sensitivity_hint = ui.label("", "subtle")
         self.sensitivity_hint.setWordWrap(True)
-        self.sensitivity_hint.setStyleSheet("color: palette(mid-text);")
-        settings_layout.addWidget(self.sensitivity_hint)
+        body.addWidget(self.sensitivity_hint)
+        return self.settings_box
 
-        layout.addWidget(self.settings_box)
+    def _build_output_card(self) -> QWidget:
+        card = ui.Card()
+        card.body.addWidget(ui.SectionHeader("3 · Output folder", icon_name="folder"))
 
-        # -- output ---------------------------------------------------
-        output_box = QGroupBox("3. Output folder")
-        output_layout = QVBoxLayout(output_box)
         self.output_edit = QLineEdit()
         self.output_edit.setReadOnly(True)
+        self.output_edit.setProperty("variant", "path")
         self.output_edit.setPlaceholderText("Choose where to save the results")
         self.output_edit.setAccessibleName("Output folder")
-        output_layout.addWidget(self.output_edit)
+        card.body.addWidget(self.output_edit)
 
         buttons = QHBoxLayout()
-        self.choose_output_button = QPushButton("Choose folder\u2026")
+        buttons.setSpacing(SPACE["sm"])
+        self.choose_output_button = ui.text_button("Choose folder\u2026", icon_name="folder-open")
         self.choose_output_button.clicked.connect(self._choose_output_folder)
-        buttons.addWidget(self.choose_output_button)
-        self.open_output_button = QPushButton("Open")
-        self.open_output_button.setToolTip("Open the output folder in File Explorer")
+        buttons.addWidget(self.choose_output_button, 1)
+        self.open_output_button = ui.text_button(
+            "Open",
+            icon_name="external-link",
+            tooltip="Open the output folder in File Explorer",
+        )
         self.open_output_button.clicked.connect(self._open_output_folder)
         buttons.addWidget(self.open_output_button)
-        output_layout.addLayout(buttons)
+        card.body.addLayout(buttons)
 
         self.recursive_check = QCheckBox("Include subfolders when adding a folder")
         self.recursive_check.toggled.connect(self._on_recursive_toggled)
-        output_layout.addWidget(self.recursive_check)
+        card.body.addWidget(self.recursive_check)
+        return card
 
-        layout.addWidget(output_box)
-        layout.addStretch(1)
+    # -- workspace ------------------------------------------------------
+    def _build_workspace(self) -> QWidget:
+        """The batch list with its toolbar, empty state and warning rail."""
 
-        panel.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
-        panel.setMinimumWidth(290)
-        return panel
-
-    def _build_right_panel(self) -> QWidget:
         panel = QWidget()
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(8)
+        layout.setSpacing(SPACE["md"])
 
-        toolbar = QHBoxLayout()
-        self.add_files_button = QPushButton("Add files\u2026")
+        layout.addWidget(self._build_toolbar())
+
+        self.table = DropTableView()
+        self.table.setModel(self.model)
+        self.table.setItemDelegate(BatchRowDelegate(self.table))
+        self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.table.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
+        self.table.setAlternatingRowColors(False)
+        self.table.setShowGrid(False)
+        self.table.setMouseTracking(True)
+        self.table.verticalHeader().setVisible(False)
+        self.table.verticalHeader().setDefaultSectionSize(ROW_HEIGHT)
+        self.table.setSortingEnabled(False)
+        self.table.files_dropped.connect(self._on_files_dropped)
+        self.table.hover_changed.connect(self._on_drop_hover)
+        self.table.doubleClicked.connect(lambda _: self._review_selected())
+        self.table.setAccessibleName("List of PDF files to process")
+
+        header = self.table.horizontalHeader()
+        header.setSectionResizeMode(BatchTableModel.COL_FILE, QHeaderView.ResizeMode.Stretch)
+        header.setHighlightSections(False)
+        header.setFixedHeight(34)
+        for column, width in (
+            (BatchTableModel.COL_PAGES, 74),
+            (BatchTableModel.COL_SEP, 128),
+            (BatchTableModel.COL_BLANK, 118),
+            (BatchTableModel.COL_OUT, 104),
+        ):
+            header.setSectionResizeMode(column, QHeaderView.ResizeMode.Fixed)
+            self.table.setColumnWidth(column, width)
+        header.setSectionResizeMode(
+            BatchTableModel.COL_STATUS, QHeaderView.ResizeMode.Fixed
+        )
+        self.table.setColumnWidth(BatchTableModel.COL_STATUS, 186)
+        self.table.selectionModel().selectionChanged.connect(
+            lambda *_: self._update_actions()
+        )
+        layout.addWidget(self.table, 1)
+
+        self.empty_hint = ui.DropZone()
+        self.empty_hint.clicked.connect(self._add_files)
+        layout.addWidget(self.empty_hint, 1)
+        # The list and its empty state occupy the same slot; only one shows.
+        self.table.setVisible(False)
+
+        layout.addWidget(self._build_detail_rail())
+        return panel
+
+    def _build_toolbar(self) -> QWidget:
+        bar = QWidget()
+        layout = QHBoxLayout(bar)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(SPACE["sm"])
+
+        self.add_files_button = ui.text_button(
+            "Add files", icon_name="file-plus", kind="info"
+        )
         self.add_files_button.clicked.connect(self._add_files)
-        self.add_folder_button = QPushButton("Add folder\u2026")
+        self.add_folder_button = ui.text_button("Add folder", icon_name="folder-plus")
         self.add_folder_button.clicked.connect(self._add_folder)
-        self.remove_button = QPushButton("Remove selected")
+        self.remove_button = ui.text_button("Remove", icon_name="x")
+        self.remove_button.setShortcut(QKeySequence(Qt.Key.Key_Delete))
         self.remove_button.clicked.connect(self._remove_selected)
-        self.clear_button = QPushButton("Clear list")
+        self.clear_button = ui.text_button("Clear list", icon_name="trash")
         self.clear_button.clicked.connect(self._clear_list)
+
         for button in (
             self.add_files_button,
             self.add_folder_button,
             self.remove_button,
             self.clear_button,
         ):
-            toolbar.addWidget(button)
-        toolbar.addStretch(1)
-        self.review_button = QPushButton("Review pages\u2026")
-        self.review_button.setToolTip(
-            "Look at the detected pages and correct them before processing"
+            layout.addWidget(button)
+
+        layout.addStretch(1)
+
+        self.review_button = ui.text_button(
+            "Review pages\u2026",
+            icon_name="eye",
+            tooltip="Look at the detected pages and correct them before processing",
         )
         self.review_button.clicked.connect(self._review_selected)
-        toolbar.addWidget(self.review_button)
-        layout.addLayout(toolbar)
+        layout.addWidget(self.review_button)
+        return bar
 
-        self.table = DropTableView()
-        self.table.setModel(self.model)
-        self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.table.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
-        self.table.setAlternatingRowColors(True)
-        self.table.verticalHeader().setVisible(False)
-        self.table.setSortingEnabled(False)
-        self.table.files_dropped.connect(self._on_files_dropped)
-        self.table.doubleClicked.connect(lambda _: self._review_selected())
-        self.table.setAccessibleName("List of PDF files to process")
+    def _build_detail_rail(self) -> QWidget:
+        """Contextual warnings plus the per-file resolution choices."""
 
-        header = self.table.horizontalHeader()
-        header.setSectionResizeMode(BatchTableModel.COL_FILE, QHeaderView.ResizeMode.Stretch)
-        for column in (
-            BatchTableModel.COL_PAGES,
-            BatchTableModel.COL_SEP,
-            BatchTableModel.COL_BLANK,
-            BatchTableModel.COL_OUT,
-        ):
-            header.setSectionResizeMode(column, QHeaderView.ResizeMode.ResizeToContents)
-        header.setSectionResizeMode(
-            BatchTableModel.COL_STATUS, QHeaderView.ResizeMode.Interactive
+        self.detail_card = ui.Card(
+            accent="warning", accent_fill=True, padding=SPACE["md"], spacing=SPACE["sm"]
         )
-        self.table.setColumnWidth(BatchTableModel.COL_STATUS, 220)
-        self.table.selectionModel().selectionChanged.connect(
-            lambda *_: self._update_actions()
-        )
-        layout.addWidget(self.table, 1)
 
-        self.empty_hint = QLabel(
-            "<b>Drop PDF files here</b><br>or use <b>Add files</b> / <b>Add folder</b> to get started"
+        top = QHBoxLayout()
+        top.setSpacing(SPACE["sm"])
+        self.detail_icon = QLabel()
+        self.detail_icon.setFixedSize(16, 16)
+        self.detail_icon.setPixmap(
+            icons.pixmap("alert-triangle", color("warning_soft_fg"), 16)
         )
-        self.empty_hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.empty_hint.setStyleSheet(
-            "color: palette(mid-text); padding: 10px; border: 1px dashed palette(mid);"
-            " border-radius: 8px;"
-        )
-        layout.addWidget(self.empty_hint)
+        top.addWidget(self.detail_icon, 0, Qt.AlignmentFlag.AlignTop)
 
-        self.detail = QLabel()
+        self.detail = ui.label("", "body")
         self.detail.setWordWrap(True)
         self.detail.setTextFormat(Qt.TextFormat.RichText)
-        self.detail.setVisible(False)
-        self.detail.setStyleSheet(
-            "padding: 8px; border-radius: 6px; background: rgba(157,93,0,0.10);"
-        )
-        layout.addWidget(self.detail)
+        top.addWidget(self.detail, 1)
+        self.detail_card.body.addLayout(top)
 
         self.resolve_bar = QWidget()
         resolve_layout = QHBoxLayout(self.resolve_bar)
-        resolve_layout.setContentsMargins(0, 0, 0, 0)
-        self.copy_one_button = QPushButton("Save as one cleaned document")
-        self.copy_one_button.setToolTip(
-            "Do not split this file; write a single cleaned copy instead."
+        resolve_layout.setContentsMargins(26, 0, 0, 0)
+        resolve_layout.setSpacing(SPACE["sm"])
+
+        resolve_layout.addWidget(ui.label("For the selected file:", "subtle"))
+        self.copy_one_button = ui.text_button(
+            "Save as one cleaned document",
+            icon_name="copy",
+            kind="info-outline",
+            tooltip="Do not split this file; write a single cleaned copy instead.",
         )
         self.copy_one_button.clicked.connect(self._resolve_as_single_copy)
-        self.skip_button = QPushButton("Skip this file")
+        self.skip_button = ui.text_button(
+            "Skip this file", icon_name="slash-circle", kind="danger-outline"
+        )
         self.skip_button.clicked.connect(self._resolve_as_skip)
-        self.unskip_button = QPushButton("Include again")
+        self.unskip_button = ui.text_button("Include again", icon_name="rotate-ccw")
         self.unskip_button.clicked.connect(self._resolve_unskip)
-        resolve_layout.addWidget(QLabel("For the selected file:"))
-        resolve_layout.addWidget(self.copy_one_button)
-        resolve_layout.addWidget(self.skip_button)
-        resolve_layout.addWidget(self.unskip_button)
+        for button in (self.copy_one_button, self.skip_button, self.unskip_button):
+            resolve_layout.addWidget(button)
         resolve_layout.addStretch(1)
+
+        self.detail_card.body.addWidget(self.resolve_bar)
         self.resolve_bar.setVisible(False)
-        layout.addWidget(self.resolve_bar)
+        self.detail_card.setVisible(False)
+        return self.detail_card
 
-        return panel
+    # -- action bar -----------------------------------------------------
+    def _build_action_bar(self) -> QWidget:
+        """The sticky footer: selection summary, progress and commit actions."""
 
-    def _build_footer(self) -> QWidget:
-        footer = QWidget()
-        layout = QHBoxLayout(footer)
-        layout.setContentsMargins(0, 0, 0, 0)
+        bar = QWidget()
+        bar.setObjectName("actionBar")
+        layout = QHBoxLayout(bar)
+        layout.setContentsMargins(SPACE["lg"], SPACE["md"], SPACE["lg"], SPACE["md"])
+        layout.setSpacing(SPACE["md"])
 
+        self.selection_count = ui.Pill("0", "neutral", solid=True)
+        self.selection_count.setFixedWidth(34)
+        layout.addWidget(self.selection_count)
+
+        summary = QVBoxLayout()
+        summary.setSpacing(0)
+        self.selection_title = ui.label("No files queued", "body")
+        self.selection_title.setStyleSheet("font-weight: 700;")
+        summary.addWidget(self.selection_title)
+        self.selection_hint = ui.label("Add scanned PDFs to begin", "subtle")
+        summary.addWidget(self.selection_hint)
+        layout.addLayout(summary)
+
+        layout.addSpacing(SPACE["lg"])
+
+        progress_box = QVBoxLayout()
+        progress_box.setSpacing(SPACE["xs"])
         self.progress = QProgressBar()
         self.progress.setVisible(False)
-        self.progress.setMinimumWidth(260)
+        self.progress.setTextVisible(False)
+        self.progress.setMinimumWidth(220)
         self.progress.setAccessibleName("Overall progress")
-        layout.addWidget(self.progress, 1)
+        progress_box.addWidget(self.progress)
+        self.progress_label = ui.label("", "subtle")
+        progress_box.addWidget(self.progress_label)
+        layout.addLayout(progress_box, 1)
 
-        self.progress_label = QLabel("")
-        layout.addWidget(self.progress_label)
-        layout.addStretch(1)
-
-        self.analyze_button = QPushButton("Analyse")
-        self.analyze_button.setToolTip("Check the PDFs and show what would happen (F5)")
-        self.analyze_button.setShortcut(QKeySequence(Qt.Key.Key_F5))
-        self.analyze_button.clicked.connect(self._start_analysis)
-        layout.addWidget(self.analyze_button)
-
-        self.cancel_button = QPushButton("Cancel")
+        self.cancel_button = ui.text_button("Cancel", icon_name="x")
         self.cancel_button.clicked.connect(self._cancel)
         self.cancel_button.setEnabled(False)
         layout.addWidget(self.cancel_button)
 
-        self.process_button = QPushButton("Process batch")
+        self.analyze_button = ui.text_button(
+            "Analyse",
+            icon_name="search",
+            tooltip="Check the PDFs and show what would happen (F5)",
+        )
+        self.analyze_button.setShortcut(QKeySequence(Qt.Key.Key_F5))
+        self.analyze_button.clicked.connect(self._start_analysis)
+        layout.addWidget(self.analyze_button)
+
+        self.process_button = ui.text_button(
+            "Process batch", icon_name="zap", kind="primary"
+        )
         self.process_button.setObjectName("processButton")
         self.process_button.setProperty("role", "primary")
+        self.process_button.setShortcut(QKeySequence("Ctrl+Return"))
         self.process_button.setDefault(True)
         self.process_button.clicked.connect(self._start_export)
         layout.addWidget(self.process_button)
 
-        return footer
+        bar.setStyleSheet(
+            f"QWidget#actionBar {{ background: {color('surface')};"
+            f" border-top: 1px solid {color('line')}; }}"
+        )
+        return bar
 
     def _toggle_theme(self, dark: bool) -> None:
         """Switch appearance without rebuilding the active batch or review state."""
@@ -460,10 +667,50 @@ class MainWindow(QMainWindow):
         app = QGuiApplication.instance()
         if app is not None:
             apply_theme(app, dark=dark)
-        self.theme_button.setText("Light mode" if dark else "Dark mode")
+
+        # Widgets that bake tokens into their own stylesheet (or cache tinted
+        # pixmaps) cannot be restyled by the global sheet alone, so refresh the
+        # icon cache and re-emit the few values that were computed at build time.
+        icons.clear_cache()
+        self.theme_button.setIcon(icons.icon("sun" if dark else "moon", "muted", 16))
+        self.theme_button.setToolTip(
+            "Switch to light appearance" if dark else "Switch to dark appearance"
+        )
+        self.brand_mark.update()
+        self._restyle_chrome()
         self.statusBar().showMessage(
             "Dark appearance enabled." if dark else "Light appearance enabled.", 3000
         )
+        self._persist()
+
+    def _restyle_chrome(self) -> None:
+        """Re-apply palette-dependent styling after a theme change."""
+
+        for name, widget in (
+            ("appBar", self.centralWidget().findChild(QWidget, "appBar")),
+            ("actionBar", self.centralWidget().findChild(QWidget, "actionBar")),
+        ):
+            if widget is None:  # pragma: no cover - defensive
+                continue
+            edge = "border-bottom" if name == "appBar" else "border-top"
+            widget.setStyleSheet(
+                f"QWidget#{name} {{ background: {color('surface')};"
+                f" {edge}: 1px solid {color('line')}; }}"
+            )
+
+        for pill in (self.version_pill, self.offline_badge, self.batch_pill,
+                     self.selection_count):
+            pill.set_accent(pill._accent)
+        self.detail_card.set_accent(self.detail_card._accent, self.detail_card._accent_fill)
+        self.detail_icon.setPixmap(
+            icons.pixmap("alert-triangle", color("warning_soft_fg"), 16)
+        )
+        for chip in (self.stat_total, self.stat_separators, self.stat_blanks,
+                     self.stat_content):
+            chip.set_value(chip._value)
+        self._refresh_stats()
+        self.model.emit_all_changed()
+        self.table.viewport().update()
 
     # ------------------------------------------------------------------
     # Settings binding
@@ -497,6 +744,14 @@ class MainWindow(QMainWindow):
         self.recursive_check.setChecked(self.settings.recursive)
         self.output_edit.setText(self.settings.output_folder)
 
+        # Restore the remembered appearance. "system" keeps the light default
+        # rather than guessing, so the first run always looks the same.
+        if self.settings.theme == "dark":
+            self.theme_button.blockSignals(True)
+            self.theme_button.setChecked(True)
+            self.theme_button.blockSignals(False)
+            self._toggle_theme(True)
+
         for widget in blocked:
             widget.blockSignals(False)
 
@@ -516,6 +771,7 @@ class MainWindow(QMainWindow):
         )
         self.settings.recursive = self.recursive_check.isChecked()
         self.settings.output_folder = self.output_edit.text()
+        self.settings.theme = "dark" if self.dark_mode else "light"
         self.store.save(self.settings)
 
     def _current_settings(self) -> AnalysisSettings:
@@ -538,6 +794,12 @@ class MainWindow(QMainWindow):
     # ------------------------------------------------------------------
     def _sync_mode_controls(self) -> None:
         split = self.split_radio.isChecked()
+
+        # The page header narrates the active mode.
+        self.batch_title.setText(
+            "Scanning Separation & Blank Cleanup" if split else "Blank Page Cleanup"
+        )
+
         for widget in (
             self.separator_label,
             self.separator_combo,
@@ -716,7 +978,64 @@ class MainWindow(QMainWindow):
         self._update_actions()
 
     def _refresh_empty_hint(self) -> None:
-        self.empty_hint.setVisible(not self.model.rows)
+        empty = not self.model.rows
+        self.empty_hint.setVisible(empty)
+        self.table.setVisible(not empty)
+        self._refresh_stats()
+
+    def _on_drop_hover(self, hovering: bool) -> None:
+        self.empty_hint.set_hover(hovering)
+
+    def _refresh_stats(self) -> None:
+        """Update the header metrics and the footer selection summary."""
+
+        rows = self.model.rows
+        analysed = [row for row in rows if row.analysis and not row.analysis.failed]
+
+        pages = sum(row.page_count for row in analysed)
+        separators = sum(len(row.separator_pages) for row in analysed)
+        blanks = sum(len(row.blank_pages) for row in analysed)
+        outputs = sum(row.expected_outputs for row in analysed)
+
+        self.stat_total.set_value(str(pages))
+        self.stat_separators.set_value(str(separators))
+        self.stat_blanks.set_value(str(blanks))
+        self.stat_content.set_value(str(outputs))
+
+        # Batch identity chip
+        if not rows:
+            self.batch_pill.set_text("NO BATCH LOADED")
+        else:
+            self.batch_pill.set_text(f"BATCH: {len(rows)} FILE{'S' if len(rows) != 1 else ''}")
+
+        # Footer summary
+        self.selection_count.set_text(str(len(rows)))
+        if not rows:
+            self.selection_title.setText("No files queued")
+            self.selection_hint.setText("Add scanned PDFs to begin")
+            return
+
+        ready = sum(
+            1 for row in rows
+            if row.analysis and not row.blocked and not row.skipped_by_user
+        )
+        attention = sum(1 for row in rows if row.state is RowState.WARNING)
+        failed = sum(1 for row in rows if row.state is RowState.ERROR)
+
+        self.selection_title.setText(
+            f"{len(rows)} file{'s' if len(rows) != 1 else ''} queued"
+        )
+        if self.analysis_signature is None:
+            self.selection_hint.setText("Not analysed yet \u2014 press Analyse (F5)")
+            return
+
+        parts = [f"{ready} ready"]
+        if attention:
+            parts.append(f"{attention} need attention")
+        if failed:
+            parts.append(f"{failed} failed")
+        parts.append(f"{outputs} document{'s' if outputs != 1 else ''} to export")
+        self.selection_hint.setText(" \u00b7 ".join(parts))
 
     # ------------------------------------------------------------------
     # Output folder
@@ -1172,6 +1491,7 @@ class MainWindow(QMainWindow):
         self.remove_button.setEnabled(selection and not self.busy)
         self.review_button.setEnabled(selection and not self.busy and analysed)
 
+        self._refresh_stats()
         self._update_detail_panel()
 
     def _update_detail_panel(self) -> None:
@@ -1179,26 +1499,42 @@ class MainWindow(QMainWindow):
         row = self.model.row_at(rows[0]) if rows else None
 
         if row is None or row.analysis is None:
-            self.detail.setVisible(False)
+            self.detail_card.setVisible(False)
             self.resolve_bar.setVisible(False)
             return
 
         analysis = row.analysis
         messages: list[str] = []
+        accent = "warning"
         if analysis.failed:
+            accent = "danger"
             messages.append(f"<b>{row.name}</b>: {analysis.error}")
         else:
             for warning in analysis.warnings:
-                messages.append(f"\u26a0 {warning.message}")
+                messages.append(warning.message)
             if row.allow_unsplit:
+                accent = "info"
                 messages.append(
-                    "\u2713 This file will be saved as a single cleaned document."
+                    "This file will be saved as a single cleaned document."
                 )
             if row.skipped_by_user:
-                messages.append("\u2298 This file will be skipped.")
+                accent = "neutral"
+                messages.append("This file will be skipped.")
 
         self.detail.setText("<br>".join(messages) if messages else "")
-        self.detail.setVisible(bool(messages))
+        self.detail_card.setVisible(bool(messages))
+
+        # Re-tint the rail so its severity reads at a glance.
+        if messages:
+            self.detail_card.set_accent(accent, fill=True)
+            glyph = {
+                "danger": "x-circle",
+                "info": "info",
+                "neutral": "slash-circle",
+            }.get(accent, "alert-triangle")
+            self.detail_icon.setPixmap(
+                icons.pixmap(glyph, color(f"{accent}_soft_fg"), 16)
+            )
 
         needs_choice = bool(
             analysis

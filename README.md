@@ -14,6 +14,11 @@ or Tesseract for the end user to install.
 
 ![Main window](docs/screenshot-main.png)
 
+Every page in a document can be reviewed and corrected before anything is
+written to disk:
+
+![Page triage](docs/screenshot-review.png)
+
 ---
 
 ## Table of contents
@@ -288,11 +293,20 @@ pdf-batch-separator/
 │   │   ├── separator_pdf.py    # printable Code 128 sheet
 │   │   ├── report.py           # UTF-8 batch report
 │   │   └── models.py           # immutable result types
+│   ├── resources/
+│   │   ├── app.ico
+│   │   └── icons/              # SVG assets referenced by the stylesheet
 │   └── ui/
+│       ├── theme.py            # design tokens, palettes, global stylesheet
+│       ├── icons.py            # vector icon set, tinted per theme
+│       ├── components.py       # shared widgets (pills, cards, chips…)
 │       ├── main_window.py
 │       ├── batch_model.py
-│       └── document_review.py
-├── tests/                      # 233 automated tests
+│       ├── batch_delegate.py   # custom painting for the batch rows
+│       └── document_review.py  # per-document page triage
+├── docs/
+│   └── DESIGN.md               # the design system and its rules
+├── tests/                      # automated tests
 ├── packaging/
 │   ├── app.spec                # PyInstaller
 │   ├── installer.iss           # Inno Setup
