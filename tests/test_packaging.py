@@ -132,7 +132,12 @@ class TestExcludesAreSafe:
         # "pytest" and "unittest" are pulled in by the test runner itself, not
         # by the application, so they cannot be judged from inside a test.
         # test_no_test_framework_leaks_into_the_app covers them instead.
-        harness_only = {"pytest", "unittest", "setuptools", "pip"}
+        #
+        # PySide6.QtTest is the same situation one level down: pytest-qt's
+        # modeltest imports it at collection time to get
+        # QAbstractItemModelTester. No application module references it, which
+        # test_qttest_is_only_imported_by_the_test_harness asserts directly.
+        harness_only = {"pytest", "unittest", "setuptools", "pip", "PySide6.QtTest"}
         loaded = set(sys.modules)
         used = sorted(
             module
@@ -185,3 +190,51 @@ class TestExcludesAreSafe:
             pytest.skip(f"could not import the app in a subprocess: {completed.stderr[-300:]}")
         leaked = [name for name in completed.stdout.strip().split(",") if name]
         assert not leaked, f"application code imports excluded modules: {leaked}"
+
+    def test_qttest_is_only_imported_by_the_test_harness(self):
+        """PySide6.QtTest is excluded from the build, so the app must not need it.
+
+        pytest-qt imports QtTest during collection to get
+        QAbstractItemModelTester, which makes this invisible to the
+        excludes check above. Building the real UI in a clean subprocess
+        proves the exclude is safe.
+        """
+        import subprocess
+
+        script = textwrap.dedent(
+            """
+            import sys
+            from PySide6.QtWidgets import QApplication
+            app = QApplication([])
+            from pdf_batch_separator.ui.main_window import MainWindow
+            from pdf_batch_separator.ui.document_review import (  # noqa: F401
+                DocumentReviewDialog,
+            )
+            from pdf_batch_separator.ui.batch_model import BatchTableModel
+            from pdf_batch_separator.ui import icons, theme
+
+            theme.apply_theme(app)
+            window = MainWindow()
+            window.resize(1200, 800)
+            model = BatchTableModel()
+            icons.icon("check")
+            print("QtTest" if "PySide6.QtTest" in sys.modules else "clean")
+            """
+        )
+        env = dict(os.environ)
+        src = str(PROJECT_ROOT / "src")
+        env["PYTHONPATH"] = src + os.pathsep + env.get("PYTHONPATH", "")
+        env.setdefault("QT_QPA_PLATFORM", "offscreen")
+        completed = subprocess.run(
+            [sys.executable, "-c", script],
+            capture_output=True,
+            text=True,
+            env=env,
+            timeout=120,
+        )
+        if completed.returncode != 0:
+            pytest.skip(f"could not build the UI in a subprocess: {completed.stderr[-300:]}")
+        assert completed.stdout.strip().endswith("clean"), (
+            "the application imports PySide6.QtTest, which app.spec excludes; "
+            "the packaged build would crash"
+        )

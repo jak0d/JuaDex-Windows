@@ -20,6 +20,7 @@ from ..core.models import (
     ProcessingMode,
     WarningCode,
 )
+from . import theme
 
 
 class RowState(str, Enum):
@@ -58,6 +59,36 @@ class RowState(str, Enum):
             RowState.EXPORTING: "\u25b6",     # play
             RowState.DONE: "\u2713",          # check
             RowState.SKIPPED: "\u2298",       # circled slash
+        }[self]
+
+    @property
+    def accent(self) -> str:
+        """Design-system accent family used to tint this state."""
+
+        return {
+            RowState.PENDING: "neutral",
+            RowState.ANALYZING: "info",
+            RowState.READY: "success",
+            RowState.WARNING: "warning",
+            RowState.ERROR: "danger",
+            RowState.EXPORTING: "info",
+            RowState.DONE: "success",
+            RowState.SKIPPED: "neutral",
+        }[self]
+
+    @property
+    def icon(self) -> str:
+        """Name of the vector glyph that accompanies the label."""
+
+        return {
+            RowState.PENDING: "clock",
+            RowState.ANALYZING: "loader",
+            RowState.READY: "check-circle",
+            RowState.WARNING: "alert-triangle",
+            RowState.ERROR: "x-circle",
+            RowState.EXPORTING: "play",
+            RowState.DONE: "check-circle",
+            RowState.SKIPPED: "slash-circle",
         }[self]
 
 
@@ -312,13 +343,14 @@ class BatchTableModel(QAbstractTableModel):
             if column == self.COL_FILE:
                 return row.name
 
-        if role == Qt.ItemDataRole.ForegroundRole and column == self.COL_STATUS:
-            if row.state is RowState.ERROR:
-                return QColor("#c42b1c")
-            if row.state is RowState.WARNING:
-                return QColor("#9d5d00")
-            if row.state is RowState.DONE:
-                return QColor("#0f7b0f")
+        # Resolved from the active palette rather than hardcoded, so the status
+        # text keeps its contrast in the dark theme too.
+        if (
+            role == Qt.ItemDataRole.ForegroundRole
+            and column == self.COL_STATUS
+            and row.state.accent
+        ):
+            return QColor(theme.family(row.state.accent)["soft_fg"])
 
         if role == Qt.ItemDataRole.TextAlignmentRole and column in {
             self.COL_PAGES,

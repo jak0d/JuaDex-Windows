@@ -44,8 +44,15 @@ hiddenimports = [
     "pdf_batch_separator.app",
     "pdf_batch_separator.ui.main_window",
     "pdf_batch_separator.ui.batch_model",
+    "pdf_batch_separator.ui.batch_delegate",
+    "pdf_batch_separator.ui.components",
     "pdf_batch_separator.ui.document_review",
+    "pdf_batch_separator.ui.icons",
+    "pdf_batch_separator.ui.theme",
     "pdf_batch_separator.workers",
+    # The interface icons are SVG, so the Qt SVG module and its image plugin
+    # must ship with the build or every glyph would silently disappear.
+    "PySide6.QtSvg",
     "pymupdf",
     "zxingcpp",
     "numpy",
