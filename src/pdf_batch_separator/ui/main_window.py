@@ -115,8 +115,9 @@ class MainWindow(QMainWindow):
         self._export_started_at = ""
 
         self.setWindowTitle("PDF Batch Separator")
-        self.resize(1120, 780)
-        self.setMinimumSize(900, 620)
+        self.resize(1240, 820)
+        self.setMinimumSize(980, 660)
+        self.setObjectName("mainWindow")
 
         self._build_ui()
         self._apply_settings_to_ui()
@@ -155,8 +156,13 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(0, 0, 0, 0)
 
         title = QLabel("PDF Batch Separator")
-        title.setStyleSheet("font-size: 17pt; font-weight: 600;")
+        title.setObjectName("appTitle")
+        title.setStyleSheet("font-size: 18pt; font-weight: 700; letter-spacing: 0.2px;")
         layout.addWidget(title)
+
+        subtitle = QLabel("Prepare, review, and export scanned documents")
+        subtitle.setStyleSheet("color: #64748B; margin-left: 2px;")
+        layout.addWidget(subtitle)
 
         badge = QLabel("\U0001f512  Offline \u2014 " + PRIVACY_TEXT)
         badge.setStyleSheet(
@@ -364,7 +370,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.table, 1)
 
         self.empty_hint = QLabel(
-            "Drag PDF files here, or use <b>Add files</b> to get started."
+            "<b>Drop PDF files here</b><br>or use <b>Add files</b> / <b>Add folder</b> to get started"
         )
         self.empty_hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.empty_hint.setStyleSheet(
@@ -430,9 +436,10 @@ class MainWindow(QMainWindow):
         self.cancel_button.setEnabled(False)
         layout.addWidget(self.cancel_button)
 
-        self.process_button = QPushButton("Process")
+        self.process_button = QPushButton("Process batch")
+        self.process_button.setObjectName("processButton")
+        self.process_button.setProperty("role", "primary")
         self.process_button.setDefault(True)
-        self.process_button.setStyleSheet("font-weight: 600; padding: 5px 20px;")
         self.process_button.clicked.connect(self._start_export)
         layout.addWidget(self.process_button)
 

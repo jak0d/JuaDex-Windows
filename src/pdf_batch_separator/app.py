@@ -15,6 +15,7 @@ from PySide6.QtWidgets import QApplication, QMessageBox
 from . import __version__
 from .logging_config import configure_logging
 from .settings import APPLICATION, ORGANISATION
+from .ui.theme import apply_theme
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +64,7 @@ def create_application(argv: list[str] | None = None) -> QApplication:
     app.setOrganizationName(ORGANISATION)
     app.setApplicationVersion(__version__)
     app.setApplicationDisplayName("PDF Batch Separator")
+    apply_theme(app)
 
     icon_path = Path(__file__).parent / "resources" / "app.ico"
     if icon_path.exists():
