@@ -57,6 +57,7 @@ from ..settings import AppSettings, SettingsStore
 from ..workers import AnalysisWorker, ExportWorker
 from .batch_model import BatchRow, BatchTableModel, RowState
 from .document_review import DocumentReviewDialog
+from .theme import apply_theme
 
 logger = logging.getLogger(__name__)
 
@@ -113,9 +114,10 @@ class MainWindow(QMainWindow):
         self.last_summary: BatchSummary | None = None
         self.last_report_text: str = ""
         self._export_started_at = ""
+        self.dark_mode = False
 
         self.setWindowTitle("PDF Batch Separator")
-        self.resize(1240, 820)
+        self.resize(1180, 760)
         self.setMinimumSize(980, 660)
         self.setObjectName("mainWindow")
 
@@ -133,8 +135,8 @@ class MainWindow(QMainWindow):
         central = QWidget()
         self.setCentralWidget(central)
         root = QVBoxLayout(central)
-        root.setContentsMargins(16, 12, 16, 12)
-        root.setSpacing(12)
+        root.setContentsMargins(12, 10, 12, 10)
+        root.setSpacing(8)
 
         root.addWidget(self._build_header())
 
@@ -143,7 +145,7 @@ class MainWindow(QMainWindow):
         splitter.addWidget(self._build_right_panel())
         splitter.setStretchFactor(0, 0)
         splitter.setStretchFactor(1, 1)
-        splitter.setSizes([340, 780])
+        splitter.setSizes([310, 870])
         splitter.setChildrenCollapsible(False)
         root.addWidget(splitter, 1)
 
@@ -175,6 +177,13 @@ class MainWindow(QMainWindow):
         layout.addSpacing(14)
         layout.addWidget(badge)
         layout.addStretch(1)
+
+        self.theme_button = QPushButton("Dark mode")
+        self.theme_button.setCheckable(True)
+        self.theme_button.setToolTip("Switch between light and dark appearance")
+        self.theme_button.setShortcut(QKeySequence("Ctrl+Shift+D"))
+        self.theme_button.toggled.connect(self._toggle_theme)
+        layout.addWidget(self.theme_button)
 
         self.help_button = QPushButton("Help / About")
         self.help_button.setToolTip("Version, privacy and licence information (F1)")
@@ -306,7 +315,7 @@ class MainWindow(QMainWindow):
         layout.addStretch(1)
 
         panel.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
-        panel.setMinimumWidth(320)
+        panel.setMinimumWidth(290)
         return panel
 
     def _build_right_panel(self) -> QWidget:
@@ -444,6 +453,17 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.process_button)
 
         return footer
+
+    def _toggle_theme(self, dark: bool) -> None:
+        """Switch appearance without rebuilding the active batch or review state."""
+        self.dark_mode = dark
+        app = QGuiApplication.instance()
+        if app is not None:
+            apply_theme(app, dark=dark)
+        self.theme_button.setText("Light mode" if dark else "Dark mode")
+        self.statusBar().showMessage(
+            "Dark appearance enabled." if dark else "Light appearance enabled.", 3000
+        )
 
     # ------------------------------------------------------------------
     # Settings binding
