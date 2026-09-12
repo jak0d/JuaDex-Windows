@@ -1,0 +1,82 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pdf-batch-separator"
+version = "1.0.0"
+description = "Offline Windows utility that splits scanned PDFs at barcode separator sheets and removes blank pages."
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+authors = [{ name = "PDF Batch Separator contributors" }]
+keywords = ["pdf", "barcode", "code128", "scanner", "separator", "blank-page"]
+
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Win32 (MS Windows)",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: Microsoft :: Windows :: Windows 10",
+    "Operating System :: Microsoft :: Windows :: Windows 11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Office/Business",
+    "Topic :: Utilities",
+]
+
+# Pinned to versions that ship 64-bit Windows wheels for CPython 3.12, so the
+# packaged build never needs a compiler or any system dependency.
+dependencies = [
+    "PySide6-Essentials>=6.7,<7",
+    "PyMuPDF>=1.24,<2",
+    "zxing-cpp>=2.2,<3",
+    "numpy>=1.26,<3",
+    "Pillow>=10.3",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-qt>=4.4",
+    "pytest-timeout>=2.3",
+]
+build = [
+    "pyinstaller>=6.6",
+]
+
+[project.gui-scripts]
+pdf-batch-separator = "pdf_batch_separator.app:main"
+
+[project.urls]
+Homepage = "https://github.com/jak0d/JuaDex-Windows"
+Source = "https://github.com/jak0d/JuaDex-Windows"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+pdf_batch_separator = ["resources/*"]
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+pythonpath = ["src", "tests"]
+addopts = "-ra --strict-markers"
+markers = [
+    "slow: marks tests that render many pages",
+    "ui: marks tests that need a Qt platform plugin",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning:zxingcpp",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "C4", "SIM"]
+ignore = ["E501"]
