@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Callable, Iterable, Sequence
+from typing import Iterable, Sequence
 
 import numpy as np
 
@@ -30,15 +30,15 @@ except Exception as exc:  # pragma: no cover
 #: Formats searched during analysis.  Restricting the set keeps decoding fast
 #: while still catching the 1D symbologies a scanner separator sheet may use.
 SEARCH_FORMATS = (
-    zxingcpp.BarcodeFormat.Code128,
-    zxingcpp.BarcodeFormat.Code39,
-    zxingcpp.BarcodeFormat.Code93,
-    zxingcpp.BarcodeFormat.ITF,
-    zxingcpp.BarcodeFormat.Codabar,
-    zxingcpp.BarcodeFormat.QRCode,
-    zxingcpp.BarcodeFormat.DataMatrix,
-    zxingcpp.BarcodeFormat.PDF417,
-    zxingcpp.BarcodeFormat.Aztec,
+    zxingcpp.BarcodeFormat.Code128
+    | zxingcpp.BarcodeFormat.Code39
+    | zxingcpp.BarcodeFormat.Code93
+    | zxingcpp.BarcodeFormat.ITF
+    | zxingcpp.BarcodeFormat.Codabar
+    | zxingcpp.BarcodeFormat.QRCode
+    | zxingcpp.BarcodeFormat.DataMatrix
+    | zxingcpp.BarcodeFormat.PDF417
+    | zxingcpp.BarcodeFormat.Aztec
 )
 
 _NULL_CHARS = "\x00\ufeff"
@@ -226,13 +226,22 @@ def _read(image: np.ndarray) -> list:
     """Call ZXing with rotation, downscaling and inversion enabled."""
 
     try:
-        return zxingcpp.read_barcodes(
+        results = zxingcpp.read_barcodes(
             image,
             formats=SEARCH_FORMATS,
             try_rotate=True,
             try_downscale=True,
-            try_invert=True,
         )
+        if not results:
+            # ZXing-C++ Python bindings do not expose the C++ tryInvert flag,
+            # so retry with an inverted image when the normal pass finds nothing.
+            results = zxingcpp.read_barcodes(
+                255 - image,
+                formats=SEARCH_FORMATS,
+                try_rotate=True,
+                try_downscale=True,
+            )
+        return results
     except Exception:  # pragma: no cover - defensive; a bad buffer must not kill a batch
         logger.debug("Barcode decode failed for one image preparation", exc_info=True)
         return []
