@@ -250,3 +250,39 @@ class TestUpscaleRungPolicy:
         names = [a.name for a in bc.decode_page_barcodes(small, "PATCHT").attempts]
 
         assert names.index("otsu") < names.index("upscale_1.5x")
+
+
+class TestRealBarcodeDecoding:
+    """Test actual zxingcpp reading on generated barcode arrays without mocks."""
+
+    def _generate_barcode_image(self, value: str = "EAGC-EDMS-00001") -> np.ndarray:
+        barcode = bc.zxingcpp.create_barcode(value, bc.zxingcpp.BarcodeFormat.Code128)
+        try:
+            img = bc.zxingcpp.write_barcode_to_image(
+                barcode, size_hint=4, with_hrt=False, with_quiet_zones=True
+            )
+        except TypeError:
+            img = bc.zxingcpp.write_barcode_to_image(
+                barcode, scale=4, add_hrt=False, add_quiet_zones=True
+            )
+        return np.array(img, copy=True)
+
+    def test_read_real_barcode(self):
+        arr = self._generate_barcode_image("EAGC-EDMS-00001")
+        results = bc._read(arr)
+        assert len(results) >= 1
+        assert results[0].text == "EAGC-EDMS-00001"
+
+    def test_read_inverted_real_barcode(self):
+        arr = self._generate_barcode_image("PATCHT")
+        inv = 255 - arr
+        results = bc._read(inv)
+        assert len(results) >= 1
+        assert results[0].text == "PATCHT"
+
+    def test_decode_page_barcodes_with_real_barcode(self):
+        arr = self._generate_barcode_image("EAGC-EDMS-00001")
+        outcome = bc.decode_page_barcodes(arr, "EAGC-EDMS-00001")
+        assert outcome.matched
+        assert ("EAGC-EDMS-00001", "Code128") in outcome.barcodes
+

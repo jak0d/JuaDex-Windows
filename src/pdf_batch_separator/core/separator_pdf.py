@@ -38,9 +38,14 @@ def _barcode_png(value: str, scale: int = 4) -> bytes:
 
     try:
         barcode = zxingcpp.create_barcode(value, zxingcpp.BarcodeFormat.Code128)
-        image = zxingcpp.write_barcode_to_image(
-            barcode, scale=scale, add_hrt=False, add_quiet_zones=True
-        )
+        try:
+            image = zxingcpp.write_barcode_to_image(
+                barcode, size_hint=scale, with_hrt=False, with_quiet_zones=True
+            )
+        except TypeError:
+            image = zxingcpp.write_barcode_to_image(
+                barcode, scale=scale, add_hrt=False, add_quiet_zones=True
+            )
     except Exception as exc:  # pragma: no cover - depends on zxing build
         raise SeparatorGenerationError(
             f"The barcode could not be generated for this value: {exc}"
