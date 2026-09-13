@@ -10,8 +10,9 @@ expected marker appears.
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
-from typing import Iterable, Sequence
+from functools import lru_cache
 
 import numpy as np
 
@@ -29,16 +30,22 @@ except Exception as exc:  # pragma: no cover
 
 #: Formats searched during analysis.  Restricting the set keeps decoding fast
 #: while still catching the 1D symbologies a scanner separator sheet may use.
+#:
+#: zxing-cpp 3.x deprecated constructing a combined ``BarcodeFormats`` value
+#: with ``|`` and now accepts an iterable of formats. Older 2.x wheels used by
+#: the Windows build still accept the combined value, so :func:`_read_once`
+#: falls back lazily if an iterable is not supported. Keeping ``SEARCH_FORMATS``
+#: as plain enum values avoids deprecation warnings at import time.
 SEARCH_FORMATS = (
-    zxingcpp.BarcodeFormat.Code128
-    | zxingcpp.BarcodeFormat.Code39
-    | zxingcpp.BarcodeFormat.Code93
-    | zxingcpp.BarcodeFormat.ITF
-    | zxingcpp.BarcodeFormat.Codabar
-    | zxingcpp.BarcodeFormat.QRCode
-    | zxingcpp.BarcodeFormat.DataMatrix
-    | zxingcpp.BarcodeFormat.PDF417
-    | zxingcpp.BarcodeFormat.Aztec
+    zxingcpp.BarcodeFormat.Code128,
+    zxingcpp.BarcodeFormat.Code39,
+    zxingcpp.BarcodeFormat.Code93,
+    zxingcpp.BarcodeFormat.ITF,
+    zxingcpp.BarcodeFormat.Codabar,
+    zxingcpp.BarcodeFormat.QRCode,
+    zxingcpp.BarcodeFormat.DataMatrix,
+    zxingcpp.BarcodeFormat.PDF417,
+    zxingcpp.BarcodeFormat.Aztec,
 )
 
 _NULL_CHARS = "\x00\ufeff"
@@ -222,25 +229,63 @@ def _otsu_binarize(gray: np.ndarray) -> np.ndarray:
     return np.where(gray > threshold, np.uint8(255), np.uint8(0))
 
 
-def _read(image: np.ndarray) -> list:
-    """Call ZXing with rotation, downscaling and inversion enabled."""
+@lru_cache(maxsize=1)
+def _legacy_search_formats():
+    """Combined format mask for older zxing-cpp wheels."""
+
+    combined = SEARCH_FORMATS[0]
+    for barcode_format in SEARCH_FORMATS[1:]:
+        combined |= barcode_format
+    return combined
+
+
+def _read_once(image: np.ndarray) -> list:
+    """Call ZXing once, accepting both 2.x and 3.x ``formats`` APIs."""
 
     try:
-        results = zxingcpp.read_barcodes(
+        return zxingcpp.read_barcodes(
             image,
             formats=SEARCH_FORMATS,
             try_rotate=True,
             try_downscale=True,
         )
+    except TypeError:
+        return zxingcpp.read_barcodes(
+            image,
+            formats=_legacy_search_formats(),
+            try_rotate=True,
+            try_downscale=True,
+        )
+
+
+def _format_name(format_value) -> str:
+    """Stable barcode-format names across zxing-cpp releases."""
+
+    text = str(format_value).replace("BarcodeFormat.", "").strip()
+    compact = "".join(ch for ch in text if ch.isalnum()).upper()
+    known = {
+        "CODE128": "Code128",
+        "CODE39": "Code39",
+        "CODE93": "Code93",
+        "ITF": "ITF",
+        "CODABAR": "Codabar",
+        "QRCODE": "QRCode",
+        "DATAMATRIX": "DataMatrix",
+        "PDF417": "PDF417",
+        "AZTEC": "Aztec",
+    }
+    return known.get(compact, text.replace(" ", ""))
+
+
+def _read(image: np.ndarray) -> list:
+    """Call ZXing with rotation, downscaling and inversion enabled."""
+
+    try:
+        results = _read_once(image)
         if not results:
             # ZXing-C++ Python bindings do not expose the C++ tryInvert flag,
             # so retry with an inverted image when the normal pass finds nothing.
-            results = zxingcpp.read_barcodes(
-                255 - image,
-                formats=SEARCH_FORMATS,
-                try_rotate=True,
-                try_downscale=True,
-            )
+            results = _read_once(255 - image)
         return results
     except Exception:  # pragma: no cover - defensive; a bad buffer must not kill a batch
         logger.debug("Barcode decode failed for one image preparation", exc_info=True)
@@ -278,7 +323,7 @@ def decode_page_barcodes(
         hit = False
         for result in results:
             text = result.text or ""
-            fmt = str(result.format).replace("BarcodeFormat.", "")
+            fmt = _format_name(result.format)
             if not text:
                 continue
             collected.setdefault((text, fmt), None)

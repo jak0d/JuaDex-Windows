@@ -60,18 +60,23 @@ local folders.
 ## Using the application
 
 1. Launch **PDF Batch Separator** from the Start menu.
-2. Drag PDFs into the window, or use **Add files** / **Add folder**.
-3. Pick a mode: **Split by separator** or **Remove blank pages only**.
-4. In split mode, choose a separator preset or type a custom value.
-5. Keep or clear **Also remove blank pages**.
-6. Choose the output folder (a `Processed` folder next to your first input is
+2. Use the **Start here** guide in the left column. It always highlights the
+   next safest action: add files, choose output, analyse, resolve issues or
+   process.
+3. Drag PDFs onto the empty drop zone, or use **Add files** / **Add folder**.
+4. Pick a mode: **Split by separator** or **Remove blank pages only**.
+5. In split mode, choose a separator preset or type a custom value.
+6. Keep or clear **Also remove blank pages**.
+7. Choose the output folder (a `Processed` folder next to your first input is
    suggested automatically).
-7. Press **Analyse** (`F5`). The batch table fills in with pages, detected
+8. Press **Analyse** (`F5`). The batch table fills in with pages, detected
    separators, detected blanks and the number of documents that would result.
-8. Select a row and press **Review pages…** to see thumbnails and change any
-   page's status.
-9. Press **Process**. When it finishes you get a summary with **Open output
-   folder**, **Copy report** and **Process another batch**.
+9. Select a row and press **Review pages…** to see thumbnails and change any
+   page's status. Files with missing separators are automatically selected so
+   you can save them as one cleaned document, skip them, or mark the separator
+   manually.
+10. Press **Process**. When it finishes you get a summary with **Open output
+    folder**, **Copy report** and **Process another batch**.
 
 ### Making separator sheets
 

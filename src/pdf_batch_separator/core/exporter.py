@@ -17,15 +17,15 @@ from __future__ import annotations
 import logging
 import os
 import secrets
+from collections.abc import Callable, Sequence
 from pathlib import Path
-from typing import Callable, Iterable, Sequence
 
 try:
     import pymupdf
 except ImportError:  # pragma: no cover
     import fitz as pymupdf  # type: ignore[no-redef]
 
-from .analyzer import open_document, regroup
+from .analyzer import open_document
 from .grouping import group_pages
 from .models import (
     DocumentAnalysis,
@@ -34,7 +34,6 @@ from .models import (
     PageOverrides,
     PageStatus,
     ProcessingMode,
-    WarningCode,
 )
 from .naming import cleaned_name, split_name, unique_path
 
@@ -178,21 +177,25 @@ def export_document(
     )
     blanks_removed = sum(1 for status in grouping.statuses if status is PageStatus.BLANK)
 
-    # An explicit user override ("this detected separator is really content")
-    # is a deliberate instruction, not a failed detection.
-    user_chose_no_split = bool(
-        overrides and (overrides.force_not_separator or overrides.force_keep)
-    )
-    if analysis.mode is ProcessingMode.SPLIT and separators_removed == 0:
-        if not allow_unsplit_copy and not user_chose_no_split:
-            return DocumentExportResult(
-                source_path=source_path,
-                skipped=True,
-                skip_reason=(
-                    f"No separator matching \u201c{analysis.expected_separator}\u201d was found. "
-                    "Choose how to handle this file, then process again."
-                ),
-            )
+    # An explicit "this detected separator is really content" override is a
+    # deliberate no-split instruction. A force-keep on an ordinary blank page
+    # is only a blank-page correction and must not bypass the missing-separator
+    # safety prompt.
+    user_chose_no_split = bool(overrides and overrides.force_not_separator)
+    if (
+        analysis.mode is ProcessingMode.SPLIT
+        and separators_removed == 0
+        and not allow_unsplit_copy
+        and not user_chose_no_split
+    ):
+        return DocumentExportResult(
+            source_path=source_path,
+            skipped=True,
+            skip_reason=(
+                f"No separator matching “{analysis.expected_separator}” was found. "
+                "Choose how to handle this file, then process again."
+            ),
+        )
 
     if not groups:
         return DocumentExportResult(

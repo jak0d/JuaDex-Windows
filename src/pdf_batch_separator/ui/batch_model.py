@@ -14,6 +14,7 @@ from PySide6.QtCore import QAbstractTableModel, QModelIndex, Qt
 from PySide6.QtGui import QColor
 
 from ..core.models import (
+    AnalysisWarning,
     DocumentAnalysis,
     DocumentExportResult,
     PageOverrides,
@@ -169,13 +170,30 @@ class BatchRow:
 
     @property
     def _user_chose_no_split(self) -> bool:
-        """True when the user deliberately turned every separator into content.
+        """True when detected separators were deliberately kept as content.
 
-        That is an explicit instruction, not a failed detection, so the file
-        must not be treated as the "no separator found" warning case.
+        ``force_keep`` is also used for ordinary blank-page corrections, so it
+        must not be treated as permission to export a split-mode PDF that never
+        had a separator. The only override that means "do not split here" is
+        ``force_not_separator``.
         """
 
-        return bool(self.overrides.force_not_separator or self.overrides.force_keep)
+        return bool(self.overrides.force_not_separator)
+
+    def display_warnings(self) -> tuple[AnalysisWarning, ...]:
+        """Warnings that still need to be shown after row-level resolutions."""
+
+        analysis = self.effective_analysis()
+        if analysis is None or analysis.failed:
+            return ()
+        return tuple(
+            warning
+            for warning in analysis.warnings
+            if not (
+                warning.code is WarningCode.NO_SEPARATOR_FOUND
+                and (self.allow_unsplit or self._user_chose_no_split)
+            )
+        )
 
     @property
     def expected_outputs(self) -> int:
@@ -254,12 +272,18 @@ class BatchRow:
             else:
                 self.message = "Every page would be removed"
             return
-        if analysis.warnings:
+        warnings = self.display_warnings()
+        if warnings:
             self.state = RowState.WARNING
-            self.message = analysis.warnings[0].message
+            self.message = warnings[0].message
             return
         self.state = RowState.READY
-        self.message = "Ready to process"
+        if self.allow_unsplit:
+            self.message = "Will save as one cleaned document"
+        elif self._user_chose_no_split:
+            self.message = "Will keep the detected separator as content"
+        else:
+            self.message = "Ready to process"
 
 
 class BatchTableModel(QAbstractTableModel):

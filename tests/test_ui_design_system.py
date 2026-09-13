@@ -193,6 +193,12 @@ class TestComponents:
         assert not pill._icon.pixmap().isNull()
 
 
+    def test_drop_zone_accepts_drops(self, qapp):
+        zone = ui.DropZone()
+        assert zone.acceptDrops()
+        assert hasattr(zone, "files_dropped")
+
+
 class TestReviewFilters:
     """The triage grid's segmented filters."""
 

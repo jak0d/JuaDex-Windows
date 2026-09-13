@@ -11,6 +11,8 @@ values passed in, which keeps them safe to rebuild on a theme change.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from PySide6.QtCore import QRectF, QSize, Qt, Signal
 from PySide6.QtGui import QColor, QFont, QPainter, QPainterPath, QPen
 from PySide6.QtWidgets import (
@@ -555,9 +557,11 @@ class DropZone(QFrame):
     """The dashed empty-state panel shown when the batch list is empty."""
 
     clicked = Signal()
+    files_dropped = Signal(list)
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
+        self.setAcceptDrops(True)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self._hover = False
         self.setMinimumHeight(210)
@@ -595,6 +599,27 @@ class DropZone(QFrame):
                 )
             )
             self.update()
+
+    def dragEnterEvent(self, event):  # noqa: N802 - Qt naming
+        if event.mimeData().hasUrls():
+            self.set_hover(True)
+            event.acceptProposedAction()
+
+    def dragMoveEvent(self, event):  # noqa: N802 - Qt naming
+        if event.mimeData().hasUrls():
+            event.acceptProposedAction()
+
+    def dragLeaveEvent(self, event):  # noqa: N802 - Qt naming
+        self.set_hover(False)
+        super().dragLeaveEvent(event)
+
+    def dropEvent(self, event):  # noqa: N802 - Qt naming
+        self.set_hover(False)
+        urls = event.mimeData().urls()
+        paths = [Path(url.toLocalFile()) for url in urls if url.isLocalFile()]
+        if paths:
+            self.files_dropped.emit(paths)
+            event.acceptProposedAction()
 
     def mouseReleaseEvent(self, event):  # noqa: N802 - Qt naming
         if event.button() == Qt.MouseButton.LeftButton:

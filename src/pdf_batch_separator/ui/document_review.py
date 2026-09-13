@@ -97,9 +97,11 @@ class PageCard(ui.Card):
         text_column.setSpacing(2)
 
         self.page_label = ui.label(f"Page {page_index + 1}", "filename")
+        self.page_label.setTextFormat(Qt.TextFormat.PlainText)
         text_column.addWidget(self.page_label)
 
         self.detail_label = ui.label("", "subtle")
+        self.detail_label.setTextFormat(Qt.TextFormat.PlainText)
         self.detail_label.setWordWrap(True)
         text_column.addWidget(self.detail_label)
         text_column.addSpacing(SPACE["xs"])
@@ -119,21 +121,32 @@ class PageCard(ui.Card):
         controls.setSpacing(SPACE["md"])
         self.remove_box = QCheckBox("Remove this page")
         self.remove_box.setToolTip("Leave the page out of the exported document.")
-        self.remove_box.toggled.connect(self._on_toggle)
+        self.remove_box.toggled.connect(self._on_remove_toggled)
         controls.addWidget(self.remove_box)
 
         self.separator_box = QCheckBox("Treat as separator")
         self.separator_box.setToolTip(
             "Split here. Separator pages are never included in the output."
         )
-        self.separator_box.toggled.connect(self._on_toggle)
+        self.separator_box.toggled.connect(self._on_separator_toggled)
         self.separator_box.setVisible(mode is ProcessingMode.SPLIT)
         controls.addWidget(self.separator_box)
         controls.addStretch(1)
         self.body.addLayout(controls)
 
     # -- behaviour ------------------------------------------------------
-    def _on_toggle(self) -> None:
+    def _on_remove_toggled(self, checked: bool) -> None:
+        if checked and self.separator_box.isChecked():
+            self.separator_box.blockSignals(True)
+            self.separator_box.setChecked(False)
+            self.separator_box.blockSignals(False)
+        self.changed.emit()
+
+    def _on_separator_toggled(self, checked: bool) -> None:
+        if checked and self.remove_box.isChecked():
+            self.remove_box.blockSignals(True)
+            self.remove_box.setChecked(False)
+            self.remove_box.blockSignals(False)
         self.changed.emit()
 
     def set_thumbnail(self, png: bytes) -> None:
@@ -273,6 +286,7 @@ class DocumentReviewDialog(QDialog):
         left.addWidget(ui.SectionHeader("Page triage", icon_name="layers"))
 
         title = ui.label(name, "display")
+        title.setTextFormat(Qt.TextFormat.PlainText)
         title.setWordWrap(True)
         left.addWidget(title)
 

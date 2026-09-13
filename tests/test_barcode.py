@@ -280,6 +280,11 @@ class TestRealBarcodeDecoding:
         assert len(results) >= 1
         assert results[0].text == "PATCHT"
 
+    def test_format_names_are_stable_across_zxing_versions(self):
+        assert bc._format_name("BarcodeFormat.Code128") == "Code128"
+        assert bc._format_name("Code 128") == "Code128"
+        assert bc._format_name("QR Code") == "QRCode"
+
     def test_decode_page_barcodes_with_real_barcode(self):
         arr = self._generate_barcode_image("EAGC-EDMS-00001")
         outcome = bc.decode_page_barcodes(arr, "EAGC-EDMS-00001")
