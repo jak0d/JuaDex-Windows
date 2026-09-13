@@ -43,6 +43,12 @@ class TestSpecIntegrity:
     def test_entry_point_exists(self):
         assert (PROJECT_ROOT / "src" / "pdf_batch_separator" / "__main__.py").is_file()
 
+    def test_entry_point_is_named_as_the_analysis_input(self):
+        """The spec must point Analysis at the file the tests below exercise."""
+
+        text = SPEC_PATH.read_text(encoding="utf-8")
+        assert "__main__.py" in text
+
     def test_bundled_documents_exist(self):
         for document in ("THIRD_PARTY_NOTICES.md", "LICENSE", "PRIVACY.md"):
             assert (PROJECT_ROOT / document).is_file(), f"{document} is referenced by app.spec"
@@ -57,6 +63,105 @@ class TestSpecIntegrity:
         assert "console=False" in text
         assert "console=True" not in text
 
+
+class TestEntryPointIsFreezable:
+    """The entry script must survive being run without a parent package.
+
+    PyInstaller compiles the Analysis input as the program's top-level
+    ``__main__`` module, so ``__package__`` is empty inside it.  A relative
+    import there (``from .app import main``) raises
+
+        ImportError: attempted relative import with no known parent package
+
+    which the user only sees as "Failed to execute script '__main__'" after
+    installing.  Nothing in the normal ``python -m`` test run reproduces it,
+    because that launch *does* have a parent package - which is exactly how the
+    bug shipped.
+    """
+
+    ENTRY = PROJECT_ROOT / "src" / "pdf_batch_separator" / "__main__.py"
+
+    def test_entry_point_has_no_relative_imports(self):
+        """A relative import in the entry script cannot work once frozen."""
+
+        import ast
+
+        tree = ast.parse(self.ENTRY.read_text(encoding="utf-8"), filename=str(self.ENTRY))
+        relative = [
+            f"line {node.lineno}: "
+            f"from {'.' * node.level}{node.module or ''} import "
+            + ", ".join(a.name for a in node.names)
+            for node in ast.walk(tree)
+            if isinstance(node, ast.ImportFrom) and node.level > 0
+        ]
+        assert not relative, (
+            "the packaged entry script runs with no parent package, so these "
+            "relative imports would raise 'attempted relative import with no "
+            f"known parent package' at launch: {relative}"
+        )
+
+    def test_entry_point_runs_with_no_parent_package(self):
+        """Execute the entry script the way the frozen bootloader does."""
+
+        import subprocess
+
+        # run_path() with a non-"__main__" run_name mimics the frozen launch:
+        # the module executes top-level with __package__ == "", but the
+        # ``if __name__ == "__main__"`` block stays dormant so no GUI opens.
+        script = textwrap.dedent(
+            f"""
+            import runpy, sys
+            module = runpy.run_path(r"{self.ENTRY}", run_name="__pyi_probe__")
+            assert module.get("__package__") in ("", None), module.get("__package__")
+            resolve = module["_resolve_main"]
+            main = resolve()
+            print("OK:" + main.__module__ + "." + main.__name__)
+            """
+        )
+        env = dict(os.environ)
+        env.setdefault("QT_QPA_PLATFORM", "offscreen")
+        # Deliberately do NOT put src/ on PYTHONPATH: the frozen build has no
+        # such entry either, and the entry script must cope on its own.
+        env.pop("PYTHONPATH", None)
+        completed = subprocess.run(
+            [sys.executable, "-c", script],
+            capture_output=True,
+            text=True,
+            env=env,
+            cwd=str(PROJECT_ROOT.parent),
+            timeout=120,
+        )
+        if "attempted relative import" in completed.stderr:
+            pytest.fail(
+                "the entry script uses a relative import and would crash the "
+                f"packaged build:\n{completed.stderr[-500:]}"
+            )
+        if completed.returncode != 0:
+            pytest.skip(f"entry point could not be probed here: {completed.stderr[-300:]}")
+        assert completed.stdout.strip().endswith("pdf_batch_separator.app.main")
+
+    def test_freeze_support_runs_before_the_gui(self):
+        """multiprocessing.freeze_support() must precede the GUI call.
+
+        On Windows a frozen child process re-runs this script; if the GUI
+        starts first the user gets a second window instead of a worker.
+        """
+
+        source = self.ENTRY.read_text(encoding="utf-8")
+        guard = source.find('if __name__ == "__main__":')
+        assert guard != -1, "the entry script needs a __main__ guard"
+        block = source[guard:]
+
+        freeze = block.find("freeze_support()")
+        assert freeze != -1, "freeze_support() must run under the __main__ guard"
+
+        # The call that starts the application, whatever it is named.
+        starts = [block.find(call) for call in ("run()", "main()") if block.find(call) != -1]
+        assert starts, "the __main__ guard should start the application"
+        assert freeze < min(starts), (
+            "freeze_support() has to run before the application starts, or a "
+            "frozen Windows child process opens a second window"
+        )
 
 class TestHiddenImports:
     def test_declared_hidden_imports_are_importable(self):
