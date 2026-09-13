@@ -103,6 +103,16 @@ excludes = [
 
 block_cipher = None
 
+# PyInstaller compiles this entry script as the program's top-level ``__main__``
+# module, which means it runs with no parent package (``__package__`` is empty).
+# It must therefore use absolute imports only - a relative import such as
+# ``from .app import main`` raises "attempted relative import with no known
+# parent package" and the application dies at launch with nothing but a
+# "Failed to execute script" dialog.  tests/test_packaging.py enforces this.
+#
+# Because the entry script imports the application lazily (inside a function),
+# static analysis cannot follow it, so ``pdf_batch_separator.app`` is declared
+# in hiddenimports above and collect_submodules() sweeps up the rest.
 a = Analysis(
     [str(SRC / "pdf_batch_separator" / "__main__.py")],
     pathex=[str(SRC)],
