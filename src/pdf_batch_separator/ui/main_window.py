@@ -64,6 +64,12 @@ logger = logging.getLogger(__name__)
 
 PRIVACY_TEXT = "Your PDFs are processed only on this PC."
 
+# Author credit: kept in one place so the status bar and the About box never
+# drift apart.
+AUTHOR_HANDLE = "jak0d"
+AUTHOR_PROFILE_URL = "https://github.com/jak0d"
+COPYRIGHT_TEXT = "© 2026 jak0d"
+
 
 class DropTableView(QTableView):
     """Table view that accepts dropped PDFs and folders.
@@ -171,6 +177,24 @@ class MainWindow(QMainWindow):
 
         root.addWidget(self._build_action_bar())
         self.statusBar().showMessage(PRIVACY_TEXT)
+        self._add_copyright_credit()
+
+    def _add_copyright_credit(self) -> None:
+        """Pin a small author credit to the bottom-right of the status bar.
+
+        ``addPermanentWidget`` keeps it on screen whatever transient status
+        message is showing, in the conventional spot for a copyright line.
+        """
+
+        self.copyright_label = ui.label(
+            f'<a href="{AUTHOR_PROFILE_URL}">{COPYRIGHT_TEXT}</a>', "subtle"
+        )
+        self.copyright_label.setOpenExternalLinks(True)
+        self.copyright_label.setToolTip(f"Author: {AUTHOR_HANDLE} on GitHub")
+        self.copyright_label.setAccessibleName(
+            f"Copyright {COPYRIGHT_TEXT}. Opens the author's GitHub profile."
+        )
+        self.statusBar().addPermanentWidget(self.copyright_label)
 
     # -- chrome ---------------------------------------------------------
     def _build_app_bar(self) -> QWidget:
@@ -1581,6 +1605,10 @@ class MainWindow(QMainWindow):
             self,
             "About PDF Batch Separator",
             f"<h3>PDF Batch Separator {__version__}</h3>"
+            "<p><b>Credits</b><br>"
+            f"Created and maintained by <a href='{AUTHOR_PROFILE_URL}'>{AUTHOR_HANDLE}</a> "
+            f"({AUTHOR_PROFILE_URL}).<br>"
+            f"{COPYRIGHT_TEXT}. Released under the MIT licence.</p>"
             f"<p>{PRIVACY_TEXT} It works completely offline: no internet connection, "
             "no cloud account and no telemetry.</p>"
             "<p><b>Split by separator</b> finds barcode separator sheets, removes them "

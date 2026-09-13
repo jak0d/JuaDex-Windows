@@ -106,6 +106,34 @@ class TestDefaults:
     def test_privacy_statement_visible(self, window):
         assert "only on this PC" in window.statusBar().currentMessage()
 
+    def test_author_credit_in_status_bar(self, window):
+        """A small copyright for the author is pinned to the status bar."""
+
+        label = window.copyright_label
+        # A permanent widget survives transient status messages.
+        assert label.parent() is window.statusBar()
+        assert "© 2026 jak0d" in label.text()
+        assert "https://github.com/jak0d" in label.text()
+        assert label.openExternalLinks()
+
+    def test_about_box_credits_the_author(self, window, monkeypatch):
+        """The About box names the author and links to their GitHub profile."""
+
+        from pdf_batch_separator.ui import main_window
+
+        captured = {}
+
+        class FakeMessageBox:
+            @staticmethod
+            def about(parent, title, text):
+                captured["text"] = text
+
+        monkeypatch.setattr(main_window, "QMessageBox", FakeMessageBox)
+        window._show_about()
+        assert "jak0d" in captured["text"]
+        assert "https://github.com/jak0d" in captured["text"]
+        assert "© 2026 jak0d" in captured["text"]
+
     def test_process_disabled_before_analysis(self, window, split_pdf):
         window._add_paths([split_pdf])
         assert not window.process_button.isEnabled()
