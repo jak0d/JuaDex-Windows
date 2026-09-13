@@ -17,8 +17,9 @@ from .core.models import (
     ProcessingMode,
 )
 
-ORGANISATION = "PDF Batch Separator"
-APPLICATION = "PDF Batch Separator"
+ORGANISATION = "JuaDex"
+APPLICATION = "PDFs Separator"
+DISPLAY_NAME = "JuaDex PDFs Separator"
 
 
 @dataclass

@@ -212,7 +212,7 @@ class TestAnalysisWorkflow:
 
         outputs = sorted(p.name for p in outdir.glob("*.pdf"))
         assert outputs == ["split - 001.pdf", "split - 002.pdf"]
-        assert list(outdir.glob("PDF Batch Separator report*.txt"))
+        assert list(outdir.glob("JuaDex PDFs Separator report*.txt"))
 
     def test_no_marker_blocks_export(self, qapp, window, nomarker_pdf, outdir):
         window._add_paths([nomarker_pdf])

@@ -1,16 +1,16 @@
-; Inno Setup script for PDF Batch Separator
+; Inno Setup script for JuaDex PDFs Separator
 ;
 ; Build the application first:
 ;     pyinstaller packaging/app.spec --noconfirm --clean
 ; then compile this script:
 ;     "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" packaging\installer.iss
 ;
-; The result is installer_output\PDF-Batch-Separator-<version>-Setup.exe
+; The result is installer_output\JuaDex-PDFs-Separator-<version>-Setup.exe
 
-#define MyAppName "PDF Batch Separator"
+#define MyAppName "JuaDex PDFs Separator"
 #define MyAppVersion "1.0.0"
-#define MyAppPublisher "PDF Batch Separator contributors"
-#define MyAppExeName "PDF Batch Separator.exe"
+#define MyAppPublisher "JuaDex contributors"
+#define MyAppExeName "JuaDex PDFs Separator.exe"
 #define MyAppId "{{B4E8A0F3-9C2D-4E77-9B1A-5F3D7C6E8A21}"
 
 [Setup]
@@ -25,7 +25,7 @@ DisableProgramGroupPage=yes
 LicenseFile=..\LICENSE
 InfoAfterFile=..\PRIVACY.md
 OutputDir=..\installer_output
-OutputBaseFilename=PDF-Batch-Separator-{#MyAppVersion}-Setup
+OutputBaseFilename=JuaDex-PDFs-Separator-{#MyAppVersion}-Setup
 SetupIconFile=..\src\pdf_batch_separator\resources\app.ico
 Compression=lzma2/max
 SolidCompression=yes

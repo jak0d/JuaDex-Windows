@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Builds PDF Batch Separator for 64-bit Windows: executable, installer and
+    Builds JuaDex PDFs Separator for 64-bit Windows: executable, installer and
     portable ZIP, with SHA-256 checksums.
 
 .DESCRIPTION
@@ -25,7 +25,7 @@ $ErrorActionPreference = "Stop"
 $ProjectRoot = Split-Path -Parent $PSScriptRoot
 Set-Location $ProjectRoot
 
-$AppName = "PDF Batch Separator"
+$AppName = "JuaDex PDFs Separator"
 $Version = "1.0.0"
 $TimestampUrl = "http://timestamp.digicert.com"
 
@@ -99,7 +99,7 @@ if ($Sign) {
 
 # --- portable zip ----------------------------------------------------------
 Write-Step "Creating the portable ZIP"
-$zipName = "PDF-Batch-Separator-$Version-portable.zip"
+$zipName = "JuaDex-PDFs-Separator-$Version-portable.zip"
 if (Test-Path $zipName) { Remove-Item $zipName -Force }
 Compress-Archive -Path "dist\$AppName\*" -DestinationPath $zipName
 Write-Host "Created $zipName"
@@ -118,7 +118,7 @@ if (-not $SkipInstaller) {
         & $iscc packaging\installer.iss
         if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed." }
 
-        $setup = "installer_output\PDF-Batch-Separator-$Version-Setup.exe"
+        $setup = "installer_output\JuaDex-PDFs-Separator-$Version-Setup.exe"
         if ($Sign) {
             Write-Step "Signing the installer"
             & signtool sign /sha1 $env:PBS_CERT_THUMBPRINT /fd SHA256 `

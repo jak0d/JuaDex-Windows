@@ -19,7 +19,7 @@ except ImportError:  # pragma: no cover
 from pdf_batch_separator.core.separator_pdf import A4_HEIGHT_PT, A4_WIDTH_PT, _barcode_png
 
 TEXT_BLOCK = (
-    "This is a synthetic test document generated for the PDF Batch Separator "
+    "This is a synthetic test document generated for the JuaDex PDFs Separator "
     "test corpus. It contains ordinary paragraph text so that the blank-page "
     "detector sees a realistic amount of ink on the page. "
 )

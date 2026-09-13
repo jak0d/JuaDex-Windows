@@ -1,6 +1,6 @@
 # Third-party notices
 
-PDF Batch Separator is distributed with the third-party components listed
+JuaDex PDFs Separator is distributed with the third-party components listed
 below. Each component remains under its own licence. Full licence texts are
 installed alongside the application in the `LICENSES/` folder and are also
 available from each project's homepage.
@@ -84,7 +84,7 @@ The build satisfies the LGPL by **dynamic linking**: the PyInstaller one-folder
 build keeps the Qt DLLs as separate files that the user can replace with their
 own compatible Qt build. To keep that property:
 
-* keep using the one-folder build (`dist/PDF Batch Separator/`) for the
+* keep using the one-folder build (`dist/JuaDex PDFs Separator/`) for the
   installer and the portable ZIP;
 * do not statically link Qt;
 * ship this notice and the LGPL-3.0 text with the application;

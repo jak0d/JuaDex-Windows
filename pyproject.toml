@@ -9,7 +9,7 @@ description = "Offline Windows utility that splits scanned PDFs at barcode separ
 readme = "README.md"
 requires-python = ">=3.12"
 license = { text = "MIT" }
-authors = [{ name = "PDF Batch Separator contributors" }]
+authors = [{ name = "JuaDex contributors" }]
 keywords = ["pdf", "barcode", "code128", "scanner", "separator", "blank-page"]
 
 classifiers = [
