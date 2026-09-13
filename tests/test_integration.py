@@ -480,7 +480,7 @@ class TestReport:
         written = write_report(text, outdir)
         assert written.exists()
         assert written.read_text(encoding="utf-8") == text
-        assert written.name.startswith("PDF Batch Separator report")
+        assert written.name.startswith("JuaDex PDFs Separator report")
 
     def test_report_has_no_page_content(self, workdir, outdir):
         secret = "CONFIDENTIAL-SALARY-DATA-9931"

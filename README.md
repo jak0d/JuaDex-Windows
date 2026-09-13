@@ -1,4 +1,4 @@
-# PDF Batch Separator
+# JuaDex PDFs Separator
 
 A focused, offline Windows desktop utility that does two jobs on scanned PDFs:
 
@@ -59,7 +59,7 @@ local folders.
 
 ## Using the application
 
-1. Launch **PDF Batch Separator** from the Start menu.
+1. Launch **JuaDex PDFs Separator** from the Start menu.
 2. Drag PDFs onto the empty drop zone, or use **Add files** / **Add folder**.
 3. Pick a mode: **Split by separator** or **Remove blank pages only**.
 4. In split mode, choose a separator preset or type a custom value.
@@ -205,8 +205,8 @@ pip install -e ".[build]"
 pyinstaller packaging\app.spec --noconfirm --clean
 ```
 
-This produces `dist\PDF Batch Separator\` containing
-`PDF Batch Separator.exe` plus Python and every native dependency. It is a
+This produces `dist\JuaDex PDFs Separator\` containing
+`JuaDex PDFs Separator.exe` plus Python and every native dependency. It is a
 **windowed** build: no console window appears.
 
 Keep the one-folder layout for anything you distribute — it keeps the Qt DLLs
@@ -229,7 +229,7 @@ Install [Inno Setup 6](https://jrsoftware.org/isdl.php), then:
 ```
 
 The result is
-`installer_output\PDF-Batch-Separator-1.0.0-Setup.exe`.
+`installer_output\JuaDex-PDFs-Separator-1.0.0-Setup.exe`.
 
 The installer:
 
@@ -245,12 +245,12 @@ The installer:
 The one-folder output is already portable. To publish it:
 
 ```bat
-powershell Compress-Archive -Path "dist\PDF Batch Separator\*" ^
-    -DestinationPath "PDF-Batch-Separator-1.0.0-portable.zip"
+powershell Compress-Archive -Path "dist\JuaDex PDFs Separator\*" ^
+    -DestinationPath "JuaDex-PDFs-Separator-1.0.0-portable.zip"
 ```
 
-Unzip anywhere and run `PDF Batch Separator.exe`. Preferences are still stored
-per user in the registry; delete `HKCU\Software\PDF Batch Separator` to reset.
+Unzip anywhere and run `JuaDex PDFs Separator.exe`. Preferences are still stored
+per user in the registry; delete `HKCU\Software\JuaDex\PDFs Separator` to reset.
 
 ## Code signing and SmartScreen
 
@@ -261,17 +261,17 @@ To sign a release, sign both the application executable and the installer:
 
 ```bat
 signtool sign /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 ^
-    "dist\PDF Batch Separator\PDF Batch Separator.exe"
+    "dist\JuaDex PDFs Separator\JuaDex PDFs Separator.exe"
 
 signtool sign /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 ^
-    "installer_output\PDF-Batch-Separator-1.0.0-Setup.exe"
+    "installer_output\JuaDex-PDFs-Separator-1.0.0-Setup.exe"
 ```
 
 An EV certificate clears SmartScreen immediately; an OV certificate builds
 reputation over time. Publish SHA-256 checksums with each release:
 
 ```bat
-certutil -hashfile "installer_output\PDF-Batch-Separator-1.0.0-Setup.exe" SHA256
+certutil -hashfile "installer_output\JuaDex-PDFs-Separator-1.0.0-Setup.exe" SHA256
 ```
 
 ## Project layout

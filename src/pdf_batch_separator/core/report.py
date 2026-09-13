@@ -16,11 +16,11 @@ from .models import (
     ProcessingMode,
 )
 
-REPORT_PREFIX = "PDF Batch Separator report"
+REPORT_PREFIX = "JuaDex PDFs Separator report"
 
 
 def report_filename(when: datetime | None = None) -> str:
-    """``PDF Batch Separator report YYYY-MM-DD HHmmss.txt``."""
+    """``JuaDex PDFs Separator report YYYY-MM-DD HHmmss.txt``."""
 
     when = when or datetime.now()
     return f"{REPORT_PREFIX} {when:%Y-%m-%d %H%M%S}.txt"
@@ -60,7 +60,7 @@ def build_report(
     lines: list[str] = []
     add = lines.append
 
-    add("PDF Batch Separator \u2014 batch report")
+    add("JuaDex PDFs Separator \u2014 batch report")
     add("=" * 60)
     add("")
     add(f"Started:          {summary.started_at or 'n/a'}")

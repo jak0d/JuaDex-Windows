@@ -1,5 +1,5 @@
 # -*- mode: python ; coding: utf-8 -*-
-"""PyInstaller specification for PDF Batch Separator.
+"""PyInstaller specification for JuaDex PDFs Separator.
 
 Produces a windowed (no console) 64-bit Windows application.  Build with:
 
@@ -7,11 +7,11 @@ Produces a windowed (no console) 64-bit Windows application.  Build with:
 
 Two artefacts are produced under ``dist/``:
 
-* ``PDF Batch Separator/``      - the one-folder build used by the installer
+* ``JuaDex PDFs Separator/``    - the one-folder build used by the installer
                                   and shipped as the portable ZIP.
-* ``PDF Batch Separator.exe``   - only when ONEFILE=1 is set in the
-                                  environment (slower startup; not used by the
-                                  installer).
+* ``JuaDex PDFs Separator.exe`` - only when ONEFILE=1 is set in the
+                                  environment (slower startup; not used by
+                                  the installer).
 """
 
 import os
@@ -24,7 +24,7 @@ SPEC_DIR = Path(SPECPATH).resolve()
 PROJECT_ROOT = SPEC_DIR.parent
 SRC = PROJECT_ROOT / "src"
 
-APP_NAME = "PDF Batch Separator"
+APP_NAME = "JuaDex PDFs Separator"
 ONEFILE = os.environ.get("ONEFILE", "0") == "1"
 
 ICON = PROJECT_ROOT / "src" / "pdf_batch_separator" / "resources" / "app.ico"

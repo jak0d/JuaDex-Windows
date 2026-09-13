@@ -14,7 +14,7 @@ from PySide6.QtWidgets import QApplication, QMessageBox
 
 from . import __version__
 from .logging_config import configure_logging
-from .settings import APPLICATION, ORGANISATION
+from .settings import APPLICATION, DISPLAY_NAME, ORGANISATION
 from .ui.theme import apply_theme
 
 logger = logging.getLogger(__name__)
@@ -36,7 +36,7 @@ def _install_exception_hook(app: QApplication) -> None:
             box.setIcon(QMessageBox.Icon.Critical)
             box.setWindowTitle("Unexpected error")
             box.setText(
-                "PDF Batch Separator ran into an unexpected problem.\n\n"
+                "JuaDex PDFs Separator ran into an unexpected problem.\n\n"
                 "Your source PDFs have not been changed. You can continue working, "
                 "but it is safer to restart the application."
             )
@@ -63,7 +63,7 @@ def create_application(argv: list[str] | None = None) -> QApplication:
     app.setApplicationName(APPLICATION)
     app.setOrganizationName(ORGANISATION)
     app.setApplicationVersion(__version__)
-    app.setApplicationDisplayName("PDF Batch Separator")
+    app.setApplicationDisplayName(DISPLAY_NAME)
     apply_theme(app)
 
     icon_path = Path(__file__).parent / "resources" / "app.ico"
@@ -77,7 +77,7 @@ def main(argv: list[str] | None = None) -> int:
     """Entry point used by the console script and the packaged executable."""
 
     log_path = configure_logging()
-    logger.info("Starting PDF Batch Separator %s", __version__)
+    logger.info("Starting %s %s", DISPLAY_NAME, __version__)
     if log_path:
         logger.debug("Logging to %s", log_path)
 

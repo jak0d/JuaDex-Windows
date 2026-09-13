@@ -1,4 +1,4 @@
-"""Shared pytest fixtures for the PDF Batch Separator test suite."""
+"""Shared pytest fixtures for the JuaDex PDFs Separator test suite."""
 
 from __future__ import annotations
 

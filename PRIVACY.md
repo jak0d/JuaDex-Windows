@@ -2,7 +2,7 @@
 
 **Your PDFs are processed only on this PC.**
 
-PDF Batch Separator is an offline desktop application. It is designed so that
+JuaDex PDFs Separator is an offline desktop application. It is designed so that
 document content never leaves the computer it runs on.
 
 ## What the application does
@@ -31,8 +31,8 @@ document content never leaves the computer it runs on.
 
 | Item | Location | Contents |
 |---|---|---|
-| Preferences | Windows registry, under `HKCU\Software\PDF Batch Separator` | Last output folder, separator value, blank-page sensitivity, subfolder and theme preferences |
-| Diagnostic log | `%LOCALAPPDATA%\PDF Batch Separator\logs\` | Timestamps, operation names and error messages. **No page content, no barcode payloads from your documents, no metadata.** Rotates at 1 MB, keeps 2 previous files. |
+| Preferences | Windows registry, under `HKCU\Software\JuaDex\PDFs Separator` | Last output folder, separator value, blank-page sensitivity, subfolder and theme preferences |
+| Diagnostic log | `%LOCALAPPDATA%\JuaDex PDFs Separator\logs\` | Timestamps, operation names and error messages. **No page content, no barcode payloads from your documents, no metadata.** Rotates at 1 MB, keeps 2 previous files. |
 | Batch report | The output folder you chose | File names, page numbers, counts and status messages. **No page content.** |
 | Temporary files | Inside the output folder while writing | Partially written PDFs with unpredictable names, deleted as soon as the file is finished, on error, and on the next launch after a crash. |
 

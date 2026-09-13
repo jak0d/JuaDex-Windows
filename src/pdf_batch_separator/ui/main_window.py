@@ -52,7 +52,7 @@ from ..core.models import (
 )
 from ..core.report import build_report, write_report
 from ..core.separator_pdf import SeparatorGenerationError, create_separator_pdf
-from ..settings import AppSettings, SettingsStore
+from ..settings import DISPLAY_NAME, AppSettings, SettingsStore
 from ..workers import AnalysisWorker, ExportWorker
 from . import components as ui
 from . import icons
@@ -136,7 +136,7 @@ class MainWindow(QMainWindow):
         self._export_row_by_analysis_index: dict[int, int] = {}
         self.dark_mode = False
 
-        self.setWindowTitle("PDF Batch Separator")
+        self.setWindowTitle(DISPLAY_NAME)
         self.resize(1180, 760)
         self.setMinimumSize(980, 660)
         self.setObjectName("mainWindow")
@@ -213,9 +213,12 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.brand_mark)
         self.wordmark = ui.label("JuaDex", "wordmark")
         layout.addWidget(self.wordmark)
+        self.wordmark_suffix = ui.label("PDFs Separator", "subtle")
+        self.wordmark_suffix.setAccessibleName("JuaDex PDFs Separator")
+        layout.addWidget(self.wordmark_suffix)
 
         self.version_pill = ui.Pill(f"v{__version__}", "neutral", mono=True)
-        self.version_pill.setToolTip(f"PDF Batch Separator {__version__}")
+        self.version_pill.setToolTip(f"{DISPLAY_NAME} {__version__}")
         layout.addWidget(self.version_pill)
 
         layout.addSpacing(SPACE["sm"])
@@ -1658,8 +1661,8 @@ class MainWindow(QMainWindow):
     def _show_about(self) -> None:
         QMessageBox.about(
             self,
-            "About PDF Batch Separator",
-            f"<h3>PDF Batch Separator {__version__}</h3>"
+            f"About {DISPLAY_NAME}",
+            f"<h3>{DISPLAY_NAME} {__version__}</h3>"
             "<p><b>Credits</b><br>"
             f"Created and maintained by <a href='{AUTHOR_PROFILE_URL}'>{AUTHOR_HANDLE}</a> "
             f"({AUTHOR_PROFILE_URL}).<br>"

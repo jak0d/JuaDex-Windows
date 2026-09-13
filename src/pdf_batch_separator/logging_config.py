@@ -23,7 +23,7 @@ def log_directory() -> Path:
 
     if sys.platform.startswith("win"):
         base = os.environ.get("LOCALAPPDATA") or os.path.expanduser("~")
-        return Path(base) / "PDF Batch Separator" / "logs"
+        return Path(base) / "JuaDex PDFs Separator" / "logs"
     xdg = os.environ.get("XDG_STATE_HOME")
     base = Path(xdg) if xdg else Path.home() / ".local" / "state"
     return base / "pdf-batch-separator" / "logs"

@@ -19,13 +19,13 @@ VSVersionInfo(
         StringTable(
           '040904B0',
           [
-            StringStruct('CompanyName', 'PDF Batch Separator contributors'),
-            StringStruct('FileDescription', 'PDF Batch Separator'),
+            StringStruct('CompanyName', 'JuaDex contributors'),
+            StringStruct('FileDescription', 'JuaDex PDFs Separator'),
             StringStruct('FileVersion', '1.0.0.0'),
-            StringStruct('InternalName', 'PDF Batch Separator'),
+            StringStruct('InternalName', 'JuaDex PDFs Separator'),
             StringStruct('LegalCopyright', 'MIT licensed. See THIRD_PARTY_NOTICES.md.'),
-            StringStruct('OriginalFilename', 'PDF Batch Separator.exe'),
-            StringStruct('ProductName', 'PDF Batch Separator'),
+            StringStruct('OriginalFilename', 'JuaDex PDFs Separator.exe'),
+            StringStruct('ProductName', 'JuaDex PDFs Separator'),
             StringStruct('ProductVersion', '1.0.0.0')
           ]
         )

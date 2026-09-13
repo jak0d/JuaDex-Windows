@@ -65,7 +65,7 @@ def _copy_metadata(source_doc, target_doc) -> None:
     # Drop fields that would misrepresent the derived file.
     for key in ("format", "encryption"):
         metadata.pop(key, None)
-    metadata["producer"] = "PDF Batch Separator"
+    metadata["producer"] = "JuaDex PDFs Separator"
     try:
         target_doc.set_metadata(metadata)
     except Exception:  # pragma: no cover - metadata must never block output
