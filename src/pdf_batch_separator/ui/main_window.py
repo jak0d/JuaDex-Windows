@@ -134,7 +134,6 @@ class MainWindow(QMainWindow):
         self.last_report_text: str = ""
         self._export_started_at = ""
         self._export_row_by_analysis_index: dict[int, int] = {}
-        self._workflow_next_action = "add_files"
         self.dark_mode = False
 
         self.setWindowTitle("PDF Batch Separator")
@@ -339,7 +338,6 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(0, 0, SPACE["xs"], 0)
         layout.setSpacing(SPACE["md"])
 
-        layout.addWidget(self._build_workflow_card())
         layout.addWidget(self._build_mode_card())
         layout.addWidget(self._build_settings_card())
         layout.addWidget(self._build_output_card())
@@ -348,61 +346,6 @@ class MainWindow(QMainWindow):
         scroll.setWidget(panel)
         scroll.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
         return scroll
-
-    def _build_workflow_card(self) -> QWidget:
-        """A compact guide that tells the user what to do next."""
-
-        card = ui.Card(accent="info", padding=SPACE["lg"], spacing=SPACE["md"])
-        card.body.addWidget(ui.SectionHeader("Start here", icon_name="list-checks", accent="info"))
-
-        self.workflow_summary = ui.label(
-            "Add scanned PDFs and JuaDex will guide you through analysis, review and export.",
-            "body",
-        )
-        self.workflow_summary.setWordWrap(True)
-        card.body.addWidget(self.workflow_summary)
-
-        self.workflow_next_button = ui.text_button(
-            "Add files",
-            icon_name="file-plus",
-            kind="primary",
-            tooltip="Run the next recommended step",
-        )
-        self.workflow_next_button.clicked.connect(self._on_workflow_next)
-        card.body.addWidget(self.workflow_next_button)
-        card.body.addWidget(ui.divider())
-
-        self.workflow_steps = {}
-        for key, title, detail in (
-            ("files", "Files", "Add one or more scanned PDFs."),
-            ("setup", "Setup", "Pick split mode or blank cleanup."),
-            ("output", "Output", "Choose where new PDFs will be saved."),
-            ("analyse", "Analyse", "Preview the split plan before writing."),
-            ("review", "Review", "Resolve warnings or inspect pages."),
-            ("process", "Process", "Write the finished documents."),
-        ):
-            row = QWidget()
-            row_layout = QHBoxLayout(row)
-            row_layout.setContentsMargins(0, 0, 0, 0)
-            row_layout.setSpacing(SPACE["sm"])
-
-            pill = ui.Pill("Later", "neutral")
-            pill.setFixedWidth(54)
-            row_layout.addWidget(pill, 0, Qt.AlignmentFlag.AlignTop)
-
-            copy = QVBoxLayout()
-            copy.setSpacing(1)
-            title_label = ui.label(title, "body")
-            title_label.setStyleSheet("font-weight: 700;")
-            detail_label = ui.label(detail, "subtle")
-            detail_label.setWordWrap(True)
-            copy.addWidget(title_label)
-            copy.addWidget(detail_label)
-            row_layout.addLayout(copy, 1)
-
-            self.workflow_steps[key] = (pill, title_label, detail_label)
-            card.body.addWidget(row)
-        return card
 
     def _build_mode_card(self) -> QWidget:
         card = ui.Card()
@@ -782,13 +725,11 @@ class MainWindow(QMainWindow):
                 f" {edge}: 1px solid {color('line')}; }}"
             )
 
-        workflow_pills = [step[0] for step in getattr(self, "workflow_steps", {}).values()]
         for pill in (
             self.version_pill,
             self.offline_badge,
             self.batch_pill,
             self.selection_count,
-            *workflow_pills,
         ):
             pill.set_accent(pill._accent)
         self.detail_card.set_accent(self.detail_card._accent, self.detail_card._accent_fill)
@@ -804,191 +745,12 @@ class MainWindow(QMainWindow):
             chip.set_value(chip._value)
         self._update_sensitivity_hint()
         self._refresh_stats()
-        self._update_workflow_guide()
         self.model.emit_all_changed()
         self.table.viewport().update()
 
     # ------------------------------------------------------------------
-    # Guided workflow
+    # Analysis attention helper
     # ------------------------------------------------------------------
-    def _set_workflow_step(self, key: str, state: str, detail: str) -> None:
-        step = getattr(self, "workflow_steps", {}).get(key)
-        if not step:
-            return
-        pill, title, detail_label = step
-        label, accent = {
-            "done": ("Done", "success"),
-            "current": ("Next", "info"),
-            "attention": ("Check", "warning"),
-            "todo": ("Later", "neutral"),
-        }[state]
-        pill.set_text(label)
-        pill.set_accent(accent)
-        title.setStyleSheet(
-            "font-weight: 700;" if state in {"current", "attention"} else "font-weight: 600;"
-        )
-        detail_label.setText(detail)
-        if state == "attention":
-            detail_label.setStyleSheet(f"color: {color('warning_soft_fg')};")
-        else:
-            detail_label.setStyleSheet("")
-
-    def _update_workflow_guide(self) -> None:
-        """Keep the sidebar guide aligned with the current batch state."""
-
-        if not hasattr(self, "workflow_next_button"):
-            return
-
-        rows = self.model.rows
-        has_rows = bool(rows)
-        analysed = self.analysis_signature is not None
-        current = self._current_settings().signature()
-        stale = analysed and current != self.analysis_signature
-        output_ok = bool(self.output_edit.text().strip())
-        separator_ok = True
-        separator_message = ""
-        if self.split_radio.isChecked():
-            separator_ok, separator_message = validate_separator_value(self.separator_edit.text())
-
-        blocked_rows = [
-            row
-            for row in rows
-            if row.analysis and row.blocked and not row.analysis.failed and not row.skipped_by_user
-        ]
-        failed_rows = [
-            row for row in rows if row.analysis and row.analysis.failed and not row.skipped_by_user
-        ]
-        warning_rows = [
-            row for row in rows if row.display_warnings() and not row.skipped_by_user
-        ]
-        outputs = sum(row.expected_outputs for row in rows if row.analysis)
-        done_rows = [row for row in rows if row.state is RowState.DONE]
-
-        self._set_workflow_step(
-            "files",
-            "done" if has_rows else "current",
-            f"{len(rows)} PDF{'s' if len(rows) != 1 else ''} queued."
-            if has_rows
-            else "Drop PDFs here or choose Add files.",
-        )
-
-        if not separator_ok:
-            setup_state = "attention"
-            setup_detail = separator_message
-        elif self.split_radio.isChecked():
-            setup_state = "done" if has_rows else "todo"
-            setup_detail = f"Split at “{self.separator_edit.text().strip()}”."
-            if self.blank_check.isChecked():
-                setup_detail += " Blank pages will also be removed."
-        else:
-            setup_state = "done" if has_rows else "todo"
-            setup_detail = "Blank cleanup only; PDFs stay as single documents."
-        self._set_workflow_step("setup", setup_state, setup_detail)
-
-        self._set_workflow_step(
-            "output",
-            "done" if output_ok else ("current" if has_rows and separator_ok else "todo"),
-            self.output_edit.text() if output_ok else "Choose a destination before processing.",
-        )
-
-        if analysed and not stale:
-            analysis_state = "done"
-            analysis_detail = "Analysis is up to date."
-        elif stale:
-            analysis_state = "current" if has_rows and separator_ok else "todo"
-            analysis_detail = "Settings changed — refresh analysis."
-        else:
-            analysis_state = "current" if has_rows and separator_ok and output_ok else "todo"
-            analysis_detail = "No files are written during analysis."
-        self._set_workflow_step("analyse", analysis_state, analysis_detail)
-
-        if not analysed:
-            review_state = "todo"
-            review_detail = "Review appears after analysis."
-        elif blocked_rows or failed_rows:
-            review_state = "attention"
-            count = len(blocked_rows) + len(failed_rows)
-            review_detail = f"{count} file{'s' if count != 1 else ''} need a decision."
-        elif warning_rows:
-            review_state = "attention"
-            review_detail = (
-                f"{len(warning_rows)} non-blocking warning"
-                f"{'s' if len(warning_rows) != 1 else ''} to review."
-            )
-        else:
-            review_state = "done"
-            review_detail = "No blocking warnings."
-        self._set_workflow_step("review", review_state, review_detail)
-
-        process_enabled = self.process_button.isEnabled() if hasattr(self, "process_button") else False
-        if done_rows:
-            process_state = "done"
-            process_detail = f"{len(done_rows)} file{'s' if len(done_rows) != 1 else ''} processed."
-        elif process_enabled:
-            process_state = "current"
-            process_detail = f"Ready to create {outputs} document{'s' if outputs != 1 else ''}."
-        else:
-            process_state = "todo"
-            process_detail = "Enabled after analysis and required decisions."
-        self._set_workflow_step("process", process_state, process_detail)
-
-        if self.busy:
-            action, text, icon_name = "busy", "Working…", "loader"
-            summary = self.progress_label.text() or "The current step is running."
-        elif not has_rows:
-            action, text, icon_name = "add_files", "Add files", "file-plus"
-            summary = "Start by adding the scanned PDFs you want to process."
-        elif not separator_ok:
-            action, text, icon_name = "fix_separator", "Fix separator value", "barcode"
-            summary = "The separator value must be valid before analysis can run."
-        elif not output_ok:
-            action, text, icon_name = "choose_output", "Choose output folder", "folder-open"
-            summary = "Pick a destination so the process step has somewhere safe to write."
-        elif not analysed or stale:
-            action, text, icon_name = "analyse", "Analyse batch", "search"
-            summary = "Analyse first to preview separators, blanks and output counts."
-        elif blocked_rows or failed_rows:
-            action, text, icon_name = "show_issue", "Show first issue", "alert-triangle"
-            summary = "Resolve blocking issues before writing the batch."
-        elif process_enabled:
-            action, text, icon_name = "process", "Process batch", "zap"
-            summary = (
-                f"Everything required is ready. {outputs} document"
-                f"{'s' if outputs != 1 else ''} will be created."
-            )
-        else:
-            action, text, icon_name = "add_files", "Add more files", "file-plus"
-            summary = "No file is ready to process yet."
-
-        self._workflow_next_action = action
-        self.workflow_summary.setText(summary)
-        self.workflow_next_button.setText(text)
-        self.workflow_next_button.setIcon(icons.icon(icon_name, "on_accent", 15))
-        self.workflow_next_button.setEnabled(action != "busy")
-
-    def _on_workflow_next(self) -> None:
-        """Execute the action recommended by the guided workflow card."""
-
-        action = getattr(self, "_workflow_next_action", "add_files")
-        if self.busy or action == "busy":
-            return
-        if action == "add_files":
-            self._add_files()
-        elif action == "choose_output":
-            self._choose_output_folder()
-        elif action == "fix_separator":
-            self.separator_edit.setFocus(Qt.FocusReason.ShortcutFocusReason)
-            self.separator_edit.selectAll()
-            self.statusBar().showMessage(
-                "Enter the exact text encoded on your separator sheet.", 6000
-            )
-        elif action == "analyse":
-            self._start_analysis()
-        elif action == "show_issue":
-            self._select_first_attention()
-        elif action == "process":
-            self._start_export()
-
     def _select_first_attention(self) -> bool:
         """Select the first row whose details can help the user move forward."""
 
@@ -1809,7 +1571,6 @@ class MainWindow(QMainWindow):
 
         self._refresh_stats()
         self._update_detail_panel()
-        self._update_workflow_guide()
 
     def _update_detail_panel(self) -> None:
         rows = self._selected_rows()
