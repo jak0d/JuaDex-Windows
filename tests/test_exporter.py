@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import hashlib
-import os
 from pathlib import Path
 
 import pytest
@@ -14,6 +13,7 @@ except ImportError:  # pragma: no cover
     import fitz as pymupdf  # type: ignore[no-redef]
 
 from fixtures.builders import add_blank_page, add_separator_page, add_text_page, build_pdf
+
 from pdf_batch_separator.core import exporter
 from pdf_batch_separator.core.analyzer import analyze_document, open_document
 from pdf_batch_separator.core.exporter import (
@@ -248,6 +248,23 @@ class TestExportDocument:
         assert result.succeeded
         assert [o.path.name for o in result.outputs] == ["nomarker - cleaned.pdf"]
         assert result.blanks_removed == 1
+
+    def test_keeping_blank_does_not_bypass_missing_separator_prompt(self, workdir, outdir):
+        path = build_pdf(
+            workdir / "nomarker-with-blank.pdf",
+            lambda d: (add_text_page(d, "A"), add_blank_page(d), add_text_page(d, "B")),
+        )
+        analysis = analyze_document(path, expected_separator=SEP, remove_blanks=True)
+
+        result = export_document(
+            analysis,
+            outdir,
+            overrides=PageOverrides(force_keep=frozenset({1})),
+        )
+
+        assert result.skipped
+        assert not result.outputs
+        assert "No separator" in (result.skip_reason or "")
 
     def test_clean_only_mode(self, workdir, outdir):
         path = build_pdf(

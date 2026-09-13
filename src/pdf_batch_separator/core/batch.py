@@ -11,10 +11,10 @@ from __future__ import annotations
 import logging
 import os
 import threading
-from concurrent.futures import Future, ThreadPoolExecutor
+from collections.abc import Callable, Iterable, Sequence
+from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Iterable, Sequence
 
 from .analyzer import analyze_document
 from .exporter import export_document
@@ -145,9 +145,11 @@ def analyze_batch(
         futures: dict[Future, int] = {
             pool.submit(job, index, path): index for index, path in enumerate(paths)
         }
-        for future in futures:
-            pass  # submission complete; collection below preserves order
-        for future, index in futures.items():
+        # Surface each finished file as soon as it is ready. The returned list
+        # still preserves input order, but a short file no longer waits behind
+        # a slow first file before the UI can show its status.
+        for future in as_completed(futures):
+            index = futures[future]
             try:
                 results[index] = future.result()
             except Exception as exc:  # noqa: BLE001 - isolate a crashed worker
