@@ -1,112 +1,94 @@
 # Third-party notices
 
-JuaDex PDFs Separator is distributed with the third-party components listed
-below. Each component remains under its own licence. Full licence texts are
-installed alongside the application in the `LICENSES/` folder and are also
-available from each project's homepage.
+JuaDex PDFs Separator uses the components below. Each remains under its own
+licence. Complete selected licence texts are in `LICENSES/` and are shipped
+with official binaries. This notice does not replace those terms.
 
-> **Read the "Licensing consequences" section before distributing a build.**
-> Two dependencies (PyMuPDF and Qt/PySide6) impose obligations that affect how
-> this application may be shipped.
+> **Binary releases are not MIT-only.** The original JuaDex code is offered
+> under MIT, but an official binary combines it with AGPL- and LGPL-covered
+> components. Read the distribution requirements below before publishing or
+> mirroring a build. This document is compliance guidance, not legal advice.
 
----
+## Runtime and packaged components
 
-## Components
+| Component | Official release pin | Selected licence | Purpose / text |
+|---|---:|---|---|
+| [PyMuPDF](https://github.com/pymupdf/PyMuPDF) and bundled [MuPDF](https://mupdf.com/) | 1.28.2 | **AGPL-3.0** (commercial licensing is also available from Artifex) | PDF engine — `LICENSES/AGPL-3.0.txt` |
+| [PySide6-Essentials](https://doc.qt.io/qtforpython/), shiboken6 and Qt 6 | 6.11.2 | **LGPL-3.0-only** option | GUI — `LICENSES/LGPL-3.0.txt` and `LICENSES/GPL-3.0.txt` |
+| [zxing-cpp](https://github.com/zxing-cpp/zxing-cpp) | 2.3.0 | Apache-2.0 | Barcodes — `LICENSES/Apache-2.0.txt` |
+| [NumPy](https://numpy.org/) | 2.4.6 | BSD-3-Clause plus licences for vendored components | Image arrays — `LICENSES/NumPy-BSD-3-Clause.txt` |
+| [Pillow](https://python-pillow.org/) | 12.3.0 | MIT-CMU plus licences for vendored components | Images/icons — `LICENSES/Pillow-MIT-CMU.txt` |
+| [CPython](https://www.python.org/) | 3.12 | PSF-2.0 and incorporated-component licences | Runtime — `LICENSES/CPython-3.12.txt` |
+| [Lucide](https://lucide.dev/) / Feather-derived icon geometry | current geometry adapted in source | ISC and MIT | UI icons — `LICENSES/Lucide-ISC.txt` |
 
-| Component | Version pinned | Licence | Used for |
-|---|---|---|---|
-| [PyMuPDF](https://github.com/pymupdf/PyMuPDF) | >=1.24,<2 | **AGPL-3.0-or-later**, or a commercial licence from Artifex | Reading, rendering and writing PDF files |
-| [MuPDF](https://mupdf.com/) (bundled inside PyMuPDF) | matches PyMuPDF | **AGPL-3.0-or-later**, or a commercial licence from Artifex | PDF engine |
-| [PySide6-Essentials](https://doc.qt.io/qtforpython/) / Qt 6 | >=6.7,<7 | **LGPL-3.0** (Qt may alternatively be used under a commercial licence) | Desktop user interface |
-| [zxing-cpp](https://github.com/zxing-cpp/zxing-cpp) | >=2.2,<3 | **Apache-2.0** | Barcode decoding and Code 128 generation |
-| [NumPy](https://numpy.org/) | >=1.26,<3 | BSD-3-Clause (with 0BSD, MIT, Zlib and CC0-1.0 components) | Image array processing |
-| [Pillow](https://python-pillow.org/) | >=10.3 | MIT-CMU | Image helpers and icon generation |
-| [CPython](https://www.python.org/) | 3.12 | PSF License Agreement | Language runtime bundled by PyInstaller |
-| [PyInstaller](https://pyinstaller.org/) | >=6.6 (build only) | GPL-2.0-or-later **with a bootloader exception** that permits shipping proprietary applications | Packaging |
-| [Inno Setup](https://jrsoftware.org/isinfo.php) | 6.x (build only) | Inno Setup licence (free, permits commercial installers) | Windows installer |
+The icon path data in `src/pdf_batch_separator/ui/icons.py` follows and adapts
+Lucide geometry. Lucide's notice, including the notice for Feather-derived
+icons, is preserved in `LICENSES/Lucide-ISC.txt`.
 
-The application's own source code is available under the MIT licence; see
-`LICENSE`.
+### zxing-cpp attribution
 
----
-
-## Apache-2.0 notice for zxing-cpp
-
-```
 Copyright 2016 ZXing authors
+
 Copyright 2022 Axel Waggershauser
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+Licensed under the Apache License, Version 2.0. zxing-cpp is used unmodified.
+The complete terms are in `LICENSES/Apache-2.0.txt`.
 
-    http://www.apache.org/licenses/LICENSE-2.0
+## Build and installer components
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+| Component | Official release pin | Licence | Notes / text |
+|---|---:|---|---|
+| [PyInstaller](https://pyinstaller.org/) | 6.22.3 | GPL-2.0-or-later with bootloader exception | The exception permits distributing the packaged application — `LICENSES/PyInstaller-GPL-2.0-bootloader-exception.txt` |
+| [Inno Setup](https://jrsoftware.org/isinfo.php) | 6.x | Inno Setup licence | Used to create the Windows installer; not installed as part of JuaDex |
+
+Exact official-build pins are maintained in
+`packaging/requirements-release.txt`. Wheel-supplied notices and the installed
+version inventory are generated during the release build by
+`packaging/collect_licenses.py`.
+
+## Requirements for distributing binaries
+
+### PyMuPDF / MuPDF (AGPL-3.0)
+
+The public binary uses the AGPL option, not a commercial Artifex licence. A
+person conveying that binary must comply with AGPL-3.0, including providing the
+complete corresponding source through a method allowed by section 6. For an
+official GitHub release, publish the exact tagged JuaDex source and build
+scripts together with access to the corresponding source for PyMuPDF/MuPDF and
+other covered components. Preserve notices and state significant modifications.
+
+The MIT licence continues to apply to JuaDex's original files; it does not
+remove obligations that apply to the combined binary. Do not describe an
+official executable as “MIT licensed” without this qualification. A distributor
+that does not want to satisfy AGPL must obtain an appropriate commercial
+licence from Artifex or replace this dependency before building.
+
+### Qt / PySide6 / shiboken6 (LGPL-3.0)
+
+Official releases use the LGPL option. Keep Qt libraries dynamically linked and
+as separate, replaceable files in the PyInstaller **one-folder** layout. Do not
+publish a one-file or statically linked build. Ship the GPL-3.0 and LGPL-3.0
+texts, permit reverse engineering for debugging modifications, and provide the
+corresponding application code and installation information required by LGPL
+section 4. Qt source is available from <https://download.qt.io/>.
+
+### Other components
+
+Preserve the Apache, BSD, MIT-CMU, ISC/MIT, PSF and PyInstaller notices included
+in `LICENSES/`. The complete NumPy, Pillow and CPython files contain notices for
+components incorporated in those distributions and must be shipped intact.
+
+## Release verification
+
+Before publishing any installer or portable archive:
+
+```powershell
+python -m pip install -r packaging\requirements-release.txt
+python -m pip install -e . --no-deps
+python packaging\collect_licenses.py
+python -m pytest -q
 ```
 
-zxing-cpp is used unmodified. The Apache-2.0 licence text is included in
-`LICENSES/Apache-2.0.txt`.
-
----
-
-## Licensing consequences before you distribute
-
-These points are engineering facts about the chosen stack, not legal advice.
-Obtain your own legal review before shipping a build outside your organisation.
-
-### 1. PyMuPDF / MuPDF is AGPL-3.0, not a permissive licence
-
-The PRD's recommended stack specifies PyMuPDF. Artifex dual-licenses it under
-**AGPL-3.0-or-later** or a paid commercial licence. Practical consequences:
-
-* **Internal use inside one organisation** — distributing the installer to
-  employees of the same legal entity is generally not "distribution to the
-  public", and this is the intended deployment for this product.
-* **Distributing the application outside your organisation** under AGPL means
-  you must offer the *complete corresponding source code* of the whole
-  application, under a licence compatible with AGPL-3.0. That would override
-  the MIT licence on this project's own code for the combined work.
-* **Shipping a closed-source or commercially licensed product** requires a
-  commercial PyMuPDF licence from Artifex.
-
-If AGPL is unacceptable and a commercial licence is not an option, the PDF
-engine is the component to replace: the processing core isolates all PDF I/O in
-`core/analyzer.py`, `core/exporter.py` and `core/separator_pdf.py`.
-
-### 2. Qt / PySide6 is LGPL-3.0
-
-The build satisfies the LGPL by **dynamic linking**: the PyInstaller one-folder
-build keeps the Qt DLLs as separate files that the user can replace with their
-own compatible Qt build. To keep that property:
-
-* keep using the one-folder build (`dist/JuaDex PDFs Separator/`) for the
-  installer and the portable ZIP;
-* do not statically link Qt;
-* ship this notice and the LGPL-3.0 text with the application;
-* state that Qt is used under LGPL-3.0 and that its source is available from
-  <https://download.qt.io/>.
-
-The one-file PyInstaller mode (`ONEFILE=1`) is provided for convenience during
-testing only; it is not the recommended distribution format for this reason.
-
-### 3. PyInstaller
-
-PyInstaller is GPL-2.0-or-later, but its bootloader carries an exception that
-explicitly allows packaging applications of any licence. Using PyInstaller does
-not impose the GPL on this application.
-
----
-
-## Verifying the notices
-
-`packaging/collect_licenses.py` regenerates `LICENSES/` from the installed
-distributions, so the shipped texts always match the pinned versions:
-
-```bash
-python packaging/collect_licenses.py
-```
+Then follow every item in `docs/RELEASE_CHECKLIST.md`. If the dependency set or
+packaged file inventory changes, repeat the licence review rather than assuming
+this notice is still complete.

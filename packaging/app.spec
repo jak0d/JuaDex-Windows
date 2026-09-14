@@ -5,17 +5,11 @@ Produces a windowed (no console) 64-bit Windows application.  Build with:
 
     pyinstaller packaging/app.spec --noconfirm --clean
 
-Two artefacts are produced under ``dist/``:
-
-* ``JuaDex PDFs Separator/``    - the one-folder build used by the installer
-                                  and shipped as the portable ZIP.
-* ``JuaDex PDFs Separator.exe`` - only when ONEFILE=1 is set in the
-                                  environment (slower startup; not used by
-                                  the installer).
+The only supported release artefact is the one-folder build under
+``dist/JuaDex PDFs Separator/``. A one-file build is intentionally not offered:
+Qt libraries must remain separate and replaceable for the selected LGPL terms.
 """
 
-import os
-import sys
 from pathlib import Path
 
 from PyInstaller.utils.hooks import collect_dynamic_libs, collect_submodules
@@ -25,8 +19,6 @@ PROJECT_ROOT = SPEC_DIR.parent
 SRC = PROJECT_ROOT / "src"
 
 APP_NAME = "JuaDex PDFs Separator"
-ONEFILE = os.environ.get("ONEFILE", "0") == "1"
-
 ICON = PROJECT_ROOT / "src" / "pdf_batch_separator" / "resources" / "app.ico"
 icon_arg = str(ICON) if ICON.exists() else None
 
@@ -67,6 +59,10 @@ for document in ("THIRD_PARTY_NOTICES.md", "LICENSE", "PRIVACY.md"):
     candidate = PROJECT_ROOT / document
     if candidate.exists():
         datas.append((str(candidate), "."))
+licences = PROJECT_ROOT / "LICENSES"
+if not licences.is_dir():
+    raise FileNotFoundError("LICENSES directory is required for a distributable build")
+datas.append((str(licences), "LICENSES"))
 
 # Trim modules the application never uses.  This keeps the installer small and
 # removes network/telemetry-capable code paths we do not need.
@@ -131,61 +127,36 @@ a = Analysis(
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
-if ONEFILE:
-    exe = EXE(
-        pyz,
-        a.scripts,
-        a.binaries,
-        a.zipfiles,
-        a.datas,
-        [],
-        name=APP_NAME,
-        debug=False,
-        bootloader_ignore_signals=False,
-        strip=False,
-        upx=False,
-        runtime_tmpdir=None,
-        console=False,          # GUI application: no console window
-        disable_windowed_traceback=False,
-        argv_emulation=False,
-        target_arch=None,
-        codesign_identity=None,
-        entitlements_file=None,
-        icon=icon_arg,
-        version=str(SPEC_DIR / "version_info.txt")
-        if (SPEC_DIR / "version_info.txt").exists()
-        else None,
-    )
-else:
-    exe = EXE(
-        pyz,
-        a.scripts,
-        [],
-        exclude_binaries=True,
-        name=APP_NAME,
-        debug=False,
-        bootloader_ignore_signals=False,
-        strip=False,
-        upx=False,
-        console=False,          # GUI application: no console window
-        disable_windowed_traceback=False,
-        argv_emulation=False,
-        target_arch=None,
-        codesign_identity=None,
-        entitlements_file=None,
-        icon=icon_arg,
-        version=str(SPEC_DIR / "version_info.txt")
-        if (SPEC_DIR / "version_info.txt").exists()
-        else None,
-    )
+exe = EXE(
+    pyz,
+    a.scripts,
+    [],
+    exclude_binaries=True,
+    contents_directory=".",  # keep DLLs and required notices visible/replaceable
+    name=APP_NAME,
+    debug=False,
+    bootloader_ignore_signals=False,
+    strip=False,
+    upx=False,
+    console=False,          # GUI application: no console window
+    disable_windowed_traceback=False,
+    argv_emulation=False,
+    target_arch=None,
+    codesign_identity=None,
+    entitlements_file=None,
+    icon=icon_arg,
+    version=str(SPEC_DIR / "version_info.txt")
+    if (SPEC_DIR / "version_info.txt").exists()
+    else None,
+)
 
-    coll = COLLECT(
-        exe,
-        a.binaries,
-        a.zipfiles,
-        a.datas,
-        strip=False,
-        upx=False,
-        upx_exclude=[],
-        name=APP_NAME,
-    )
+coll = COLLECT(
+    exe,
+    a.binaries,
+    a.zipfiles,
+    a.datas,
+    strip=False,
+    upx=False,
+    upx_exclude=[],
+    name=APP_NAME,
+)

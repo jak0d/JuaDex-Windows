@@ -1,6 +1,6 @@
 MIT License
 
-Copyright (c) 2026 JuaDex contributors
+Copyright (c) 2026 jak0d
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -19,10 +19,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
----
-
-NOTE ON DISTRIBUTION: this licence covers the source code in this repository
-only. The application depends on PyMuPDF (AGPL-3.0 or commercial) and Qt via
-PySide6 (LGPL-3.0). Distributing a *built* application therefore carries
-additional obligations. See THIRD_PARTY_NOTICES.md before shipping a binary.

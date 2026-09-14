@@ -1,0 +1,13 @@
+# Exact versions used for official JuaDex 1.0.0 Windows binaries.
+# Update this file deliberately, run the full test suite and regenerate the
+# dependency licence inventory before publishing a release.
+PyMuPDF==1.28.2
+PySide6-Essentials==6.11.2
+shiboken6==6.11.2
+zxing-cpp==2.3.0
+numpy==2.4.6
+Pillow==12.3.0
+pyinstaller==6.22.3
+pytest==9.0.3
+pytest-qt==4.5.0
+pytest-timeout==2.4.0

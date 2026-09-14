@@ -3,18 +3,29 @@ __pycache__/
 *.py[cod]
 *.egg-info/
 .pytest_cache/
+.ruff_cache/
+.mypy_cache/
 .venv/
 venv/
 
-# Build artefacts
+# Local configuration and credentials (never commit release-signing material)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+
+# Build and release artefacts
 build/
 dist/
+installer_output/
 *.spec.bak
-pdf-batch-separator/build/
-pdf-batch-separator/dist/
-pdf-batch-separator/installer_output/
+SHA256SUMS-*.txt
+*-portable.zip
 
 # Generated fixtures / scratch output
-pdf-batch-separator/tests/fixtures/generated/
-pdf-batch-separator/SHA256SUMS-*.txt
-pdf-batch-separator/*-portable.zip
+tests/fixtures/generated/

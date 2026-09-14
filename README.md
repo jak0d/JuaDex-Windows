@@ -147,7 +147,7 @@ Requires Python 3.12 (3.11 also works for development; the packaged build pins
 
 ```bash
 git clone https://github.com/jak0d/JuaDex-Windows.git
-cd JuaDex-Windows/pdf-batch-separator
+cd JuaDex-Windows
 
 python -m venv .venv
 .venv\Scripts\activate          # Windows
@@ -198,38 +198,32 @@ second.
 
 ## Building the Windows application
 
-On 64-bit Windows 10 or 11:
+On 64-bit Windows 10 or 11, use the audited build script for a release:
 
-```bat
-pip install -e ".[build]"
-pyinstaller packaging\app.spec --noconfirm --clean
+```powershell
+powershell -ExecutionPolicy Bypass -File packaging\build_windows.ps1
 ```
 
-This produces `dist\JuaDex PDFs Separator\` containing
-`JuaDex PDFs Separator.exe` plus Python and every native dependency. It is a
-**windowed** build: no console window appears.
+It installs the exact versions in `packaging/requirements-release.txt`, checks
+the environment, validates complete licence texts, runs the tests, creates the
+one-folder application, smoke-tests it, and produces checksums. The output is
+`dist\JuaDex PDFs Separator\`, containing the windowed executable, Python,
+native dependencies, notices and complete licence texts.
 
-Keep the one-folder layout for anything you distribute — it keeps the Qt DLLs
-replaceable, which is how this build satisfies Qt's LGPL terms. A one-file
-executable can be produced for local testing with `set ONEFILE=1` before
-running PyInstaller, but it is not the recommended distribution format.
+Only the one-folder build is supported for distribution. It keeps Qt DLLs
+separate and replaceable for the selected LGPL terms. The spec intentionally
+does not provide a one-file mode.
 
-Refresh the bundled licence texts whenever a dependency version changes:
-
-```bat
-python packaging\collect_licenses.py
-```
+A successful build is not by itself authorization to publish. Complete and
+record `docs/RELEASE_CHECKLIST.md`, including corresponding-source and
+provenance checks.
 
 ## Building the installer
 
-Install [Inno Setup 6](https://jrsoftware.org/isdl.php), then:
-
-```bat
-"C:\Program Files (x86)\Inno Setup 6\ISCC.exe" packaging\installer.iss
-```
-
-The result is
-`installer_output\JuaDex-PDFs-Separator-1.0.0-Setup.exe`.
+Install [Inno Setup 6](https://jrsoftware.org/isdl.php), then run the audited
+build command above. It creates
+`installer_output\JuaDex-PDFs-Separator-1.0.1-Setup.exe` after tests, dependency
+pinning and licence validation pass.
 
 The installer:
 
@@ -237,7 +231,8 @@ The installer:
 - installs per-user by default so a standard account needs no administrator
   rights, and offers a per-machine install when run elevated;
 - creates a Start-menu entry and an optional desktop shortcut;
-- ships `LICENSE`, `PRIVACY.md` and `THIRD_PARTY_NOTICES.md`;
+- ships `LICENSE`, `PRIVACY.md`, `THIRD_PARTY_NOTICES.md` and all complete
+  third-party texts in `LICENSES/`;
 - removes only its own log folder on uninstall — your documents are untouched.
 
 ## Portable build
@@ -246,7 +241,7 @@ The one-folder output is already portable. To publish it:
 
 ```bat
 powershell Compress-Archive -Path "dist\JuaDex PDFs Separator\*" ^
-    -DestinationPath "JuaDex-PDFs-Separator-1.0.0-portable.zip"
+    -DestinationPath "JuaDex-PDFs-Separator-1.0.1-portable.zip"
 ```
 
 Unzip anywhere and run `JuaDex PDFs Separator.exe`. Preferences are still stored
@@ -260,18 +255,18 @@ users must choose *More info → Run anyway*. This is expected for test builds.
 To sign a release, sign both the application executable and the installer:
 
 ```bat
-signtool sign /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 ^
+signtool sign /fd SHA256 /tr https://timestamp.digicert.com /td SHA256 ^
     "dist\JuaDex PDFs Separator\JuaDex PDFs Separator.exe"
 
-signtool sign /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 ^
-    "installer_output\JuaDex-PDFs-Separator-1.0.0-Setup.exe"
+signtool sign /fd SHA256 /tr https://timestamp.digicert.com /td SHA256 ^
+    "installer_output\JuaDex-PDFs-Separator-1.0.1-Setup.exe"
 ```
 
 An EV certificate clears SmartScreen immediately; an OV certificate builds
 reputation over time. Publish SHA-256 checksums with each release:
 
 ```bat
-certutil -hashfile "installer_output\JuaDex-PDFs-Separator-1.0.0-Setup.exe" SHA256
+certutil -hashfile "installer_output\JuaDex-PDFs-Separator-1.0.1-Setup.exe" SHA256
 ```
 
 ## Project layout
@@ -325,16 +320,18 @@ tested headlessly and reused from a future CLI.
 
 ## Licensing
 
-This project's own source code is MIT licensed (see `LICENSE`).
+JuaDex's original source code is MIT licensed (see `LICENSE`), copyright 2026
+jak0d. Contributors retain copyright in their contributions and certify their
+right to submit them; see `CONTRIBUTING.md`.
 
-**Before distributing a built application, read `THIRD_PARTY_NOTICES.md`.** Two
-dependencies carry obligations that the MIT licence does not cover:
+**Official binaries are not MIT-only.** They combine the application with
+PyMuPDF/MuPDF under the selected AGPL-3.0 option and Qt/PySide6/shiboken6 under
+the selected LGPL-3.0 option. Binary distributors must provide required notices,
+relinking rights and complete corresponding source. See
+`THIRD_PARTY_NOTICES.md` and complete `docs/RELEASE_CHECKLIST.md` before
+publishing any build.
 
-- **PyMuPDF / MuPDF** is AGPL-3.0-or-later, or a paid commercial licence from
-  Artifex. Distributing binaries outside your organisation under AGPL requires
-  offering the complete corresponding source of the combined work.
-- **Qt via PySide6** is LGPL-3.0. The one-folder build keeps Qt dynamically
-  linked and replaceable, which is what satisfies those terms.
+The UI also adapts Lucide/Feather icon geometry under ISC/MIT terms. Its notice
+and all other selected third-party texts are preserved in `LICENSES/`.
 
-Internal deployment inside a single organisation — the intended use for this
-product — is the straightforward case.
+Security issues should be reported privately as described in `SECURITY.md`.
