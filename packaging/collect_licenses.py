@@ -1,106 +1,181 @@
-"""Collect dependency licence texts into ``LICENSES/`` for distribution.
+"""Validate and inventory licences for an official binary release.
 
-Run from the project root:
-
-    python packaging/collect_licenses.py
-
-The script reads licence files straight from the installed distributions, so
-the shipped texts always match the versions actually packaged.
+Run from the project root after installing ``packaging/requirements-release.txt``.
+The complete canonical licence texts are committed in ``LICENSES/``. This
+script refuses to pass when release packages are absent, at the wrong version,
+or when a required text has accidentally been replaced by a metadata stub.
+It also records any licence/notice files shipped in installed wheels.
 """
 
 from __future__ import annotations
 
 import importlib.metadata as metadata
+import platform
+import re
 import sys
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 OUTPUT_DIR = PROJECT_ROOT / "LICENSES"
+REQUIREMENTS = PROJECT_ROOT / "packaging" / "requirements-release.txt"
+INVENTORY = OUTPUT_DIR / "DEPENDENCY_VERSIONS.md"
+WHEEL_NOTICES = OUTPUT_DIR / "INSTALLED_WHEEL_NOTICES.txt"
 
-# Distribution name -> file name to write.
-PACKAGES = {
-    "PyMuPDF": "PyMuPDF-AGPL-3.0.txt",
-    "PySide6-Essentials": "PySide6-LGPL-3.0.txt",
-    "zxing-cpp": "zxing-cpp-Apache-2.0.txt",
-    "numpy": "NumPy-BSD-3-Clause.txt",
-    "pillow": "Pillow-MIT-CMU.txt",
+RUNTIME_PACKAGES = (
+    "PyMuPDF",
+    "PySide6-Essentials",
+    "shiboken6",
+    "zxing-cpp",
+    "numpy",
+    "Pillow",
+)
+
+# Files needed for the licences selected by this binary distribution. LGPL-3.0
+# incorporates GPL-3.0, so both texts must accompany Qt/PySide6.
+REQUIRED_TEXTS = {
+    "AGPL-3.0.txt": (20_000, "GNU AFFERO GENERAL PUBLIC LICENSE"),
+    "GPL-3.0.txt": (20_000, "GNU GENERAL PUBLIC LICENSE"),
+    "LGPL-3.0.txt": (5_000, "GNU LESSER GENERAL PUBLIC LICENSE"),
+    "Apache-2.0.txt": (8_000, "Apache License"),
+    "Lucide-ISC.txt": (500, "ISC License"),
+    "CPython-3.12.txt": (10_000, "PYTHON SOFTWARE FOUNDATION LICENSE"),
+    "NumPy-BSD-3-Clause.txt": (5_000, "Copyright"),
+    "Pillow-MIT-CMU.txt": (5_000, "Permission"),
+    "PyInstaller-GPL-2.0-bootloader-exception.txt": (15_000, "GNU GENERAL PUBLIC LICENSE"),
 }
 
 LICENSE_FILE_HINTS = ("LICENSE", "LICENCE", "COPYING", "NOTICE", "AUTHORS")
+PIN_RE = re.compile(r"^([A-Za-z0-9_.-]+)==([^\s;]+)$")
 
 
-def find_license_text(distribution_name: str) -> tuple[str, str]:
-    """Return ``(version, licence_text)`` for an installed distribution."""
+def release_pins() -> dict[str, str]:
+    """Read exact package pins, rejecting ranges in the release manifest."""
 
-    try:
-        dist = metadata.distribution(distribution_name)
-    except metadata.PackageNotFoundError:
-        return "not installed", ""
+    pins: dict[str, str] = {}
+    for raw in REQUIREMENTS.read_text(encoding="utf-8").splitlines():
+        line = raw.partition("#")[0].strip()
+        if not line:
+            continue
+        match = PIN_RE.fullmatch(line)
+        if not match:
+            raise ValueError(f"release requirement must be an exact == pin: {raw!r}")
+        pins[match.group(1).lower().replace("_", "-")] = match.group(2)
+    return pins
 
-    version = dist.version
-    chunks: list[str] = []
 
-    for file in dist.files or []:
+def package_key(name: str) -> str:
+    return name.lower().replace("_", "-")
+
+
+def installed_notice_files(dist: metadata.Distribution) -> list[tuple[str, str]]:
+    """Return readable notice files from a wheel using their actual paths."""
+
+    found: list[tuple[str, str]] = []
+    for file in dist.files or ():
         name = Path(str(file)).name.upper()
         if not any(name.startswith(hint) for hint in LICENSE_FILE_HINTS):
             continue
         if name.endswith((".py", ".pyc", ".so", ".pyd", ".dll")):
             continue
         try:
-            text = dist.read_text(str(file))
+            # Distribution.read_text() only reads metadata-root files. Using
+            # locate_file() also handles PEP 639's dist-info/licenses tree.
+            text = dist.locate_file(file).read_text(encoding="utf-8")
         except (OSError, UnicodeDecodeError):
             continue
-        if text and text.strip():
-            chunks.append(f"----- {file} -----\n\n{text.strip()}")
-
-    if not chunks:
-        # Fall back to the declared licence metadata.
-        meta = dist.metadata
-        declared = (
-            meta.get("License-Expression")
-            or meta.get("License")
-            or "; ".join(
-                c for c in (meta.get_all("Classifier") or []) if "License" in c
-            )
-            or "See the project homepage."
-        )
-        chunks.append(f"Declared licence: {declared}")
-
-    return version, "\n\n".join(chunks)
+        if text.strip():
+            found.append((str(file), text.rstrip()))
+    return found
 
 
 def main() -> int:
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    index: list[str] = [
-        "# Bundled dependency licences",
-        "",
-        "Generated by packaging/collect_licenses.py. Do not edit by hand.",
+    errors: list[str] = []
+    try:
+        pins = release_pins()
+    except (OSError, ValueError) as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
+
+    for filename, (minimum, marker) in REQUIRED_TEXTS.items():
+        path = OUTPUT_DIR / filename
+        try:
+            text = path.read_text(encoding="utf-8")
+        except OSError:
+            errors.append(f"missing required licence text: {path}")
+            continue
+        if len(text.encode("utf-8")) < minimum or marker not in text:
+            errors.append(f"incomplete or unexpected licence text: {path}")
+
+    rows: list[tuple[str, str, str]] = []
+    notice_chunks: list[str] = [
+        "LICENCE AND NOTICE FILES EXTRACTED FROM INSTALLED RELEASE WHEELS",
+        "Generated by packaging/collect_licenses.py; canonical texts are separate files.",
         "",
     ]
-
-    missing: list[str] = []
-    for package, filename in PACKAGES.items():
-        version, text = find_license_text(package)
-        if not text:
-            missing.append(package)
+    for package in RUNTIME_PACKAGES:
+        expected = pins.get(package_key(package))
+        if expected is None:
+            errors.append(f"{package} has no exact release pin")
             continue
-        header = (
-            f"{package} {version}\n"
-            f"{'=' * (len(package) + len(version) + 1)}\n\n"
-        )
-        (OUTPUT_DIR / filename).write_text(header + text + "\n", encoding="utf-8")
-        index.append(f"* **{package}** {version} - `{filename}`")
-        print(f"wrote {filename} ({package} {version})")
+        try:
+            dist = metadata.distribution(package)
+        except metadata.PackageNotFoundError:
+            errors.append(f"{package}=={expected} is not installed")
+            continue
+        if dist.version != expected:
+            errors.append(f"{package}: installed {dist.version}, release pin is {expected}")
 
-    (OUTPUT_DIR / "README.md").write_text("\n".join(index) + "\n", encoding="utf-8")
+        expression = (
+            dist.metadata.get("License-Expression")
+            or dist.metadata.get("License")
+            or "See bundled canonical text and upstream metadata"
+        ).strip()
+        rows.append((package, dist.version, expression.replace("\n", " ")))
+        for relative_path, text in installed_notice_files(dist):
+            notice_chunks.extend(
+                (
+                    f"===== {package} {dist.version}: {relative_path} =====",
+                    "",
+                    text,
+                    "",
+                )
+            )
 
-    if missing:
-        print(
-            "\nWARNING: not installed, licence text not collected: "
-            + ", ".join(missing),
-            file=sys.stderr,
+    if sys.version_info[:2] != (3, 12):
+        errors.append(
+            f"release licence inventory must run with CPython 3.12; found "
+            f"{sys.version_info.major}.{sys.version_info.minor}"
         )
+    else:
+        rows.append(("CPython", platform.python_version(), "PSF-2.0 and incorporated licences"))
+
+    if errors:
+        print("Licence validation failed:", file=sys.stderr)
+        for error in errors:
+            print(f"  - {error}", file=sys.stderr)
         return 1
+
+    inventory = [
+        "# Release dependency inventory",
+        "",
+        "Generated by `packaging/collect_licenses.py` from the environment used to build the binary.",
+        "",
+        "| Distribution | Version | Declared licence |",
+        "|---|---:|---|",
+    ]
+    inventory.extend(f"| {name} | {version} | {licence} |" for name, version, licence in rows)
+    inventory.extend(
+        (
+            "",
+            "See `THIRD_PARTY_NOTICES.md` for component attribution and the other files in this",
+            "directory for complete licence terms.",
+        )
+    )
+    INVENTORY.write_text("\n".join(inventory) + "\n", encoding="utf-8")
+    WHEEL_NOTICES.write_text("\n".join(notice_chunks), encoding="utf-8")
+    print(f"validated {len(REQUIRED_TEXTS)} complete licence texts")
+    print(f"wrote {INVENTORY.relative_to(PROJECT_ROOT)}")
+    print(f"wrote {WHEEL_NOTICES.relative_to(PROJECT_ROOT)}")
     return 0
 
 

@@ -53,6 +53,39 @@ class TestSpecIntegrity:
         for document in ("THIRD_PARTY_NOTICES.md", "LICENSE", "PRIVACY.md"):
             assert (PROJECT_ROOT / document).is_file(), f"{document} is referenced by app.spec"
 
+    def test_complete_licence_texts_are_bundled(self):
+        minimum_sizes = {
+            "AGPL-3.0.txt": 20_000,
+            "GPL-3.0.txt": 20_000,
+            "LGPL-3.0.txt": 5_000,
+            "Apache-2.0.txt": 8_000,
+            "Lucide-ISC.txt": 500,
+        }
+        for filename, minimum in minimum_sizes.items():
+            path = PROJECT_ROOT / "LICENSES" / filename
+            assert path.stat().st_size >= minimum, f"{filename} looks like a metadata stub"
+
+        spec = SPEC_PATH.read_text(encoding="utf-8")
+        installer = (PROJECT_ROOT / "packaging" / "installer.iss").read_text(encoding="utf-8")
+        assert 'datas.append((str(licences), "LICENSES"))' in spec
+        assert 'Source: "..\\LICENSES\\*"' in installer
+
+    def test_only_lgpl_safe_one_folder_build_is_available(self):
+        text = SPEC_PATH.read_text(encoding="utf-8")
+        assert "ONEFILE" not in text
+        assert 'contents_directory="."' in text
+        assert "COLLECT(" in text
+
+    def test_release_requirements_are_exactly_pinned(self):
+        requirements = PROJECT_ROOT / "packaging" / "requirements-release.txt"
+        lines = [
+            line.partition("#")[0].strip()
+            for line in requirements.read_text(encoding="utf-8").splitlines()
+        ]
+        pins = [line for line in lines if line]
+        assert pins
+        assert all(re.fullmatch(r"[A-Za-z0-9_.-]+==[^\s;]+", pin) for pin in pins)
+
     def test_icon_and_version_info_exist(self):
         icon = PROJECT_ROOT / "src" / "pdf_batch_separator" / "resources" / "app.ico"
         assert icon.is_file() and icon.stat().st_size > 0
@@ -163,9 +196,12 @@ class TestEntryPointIsFreezable:
             "frozen Windows child process opens a second window"
         )
 
+
 class TestHiddenImports:
     def test_declared_hidden_imports_are_importable(self):
-        pytest.importorskip("PySide6.QtWidgets", reason="Qt libraries unavailable")
+        pytest.importorskip(
+            "PySide6.QtWidgets", reason="Qt libraries unavailable", exc_type=ImportError
+        )
         broken = []
         for module in _spec_list("hiddenimports"):
             try:
@@ -175,7 +211,9 @@ class TestHiddenImports:
         assert not broken, f"app.spec lists unimportable hidden imports: {broken}"
 
     def test_every_package_submodule_is_importable(self):
-        pytest.importorskip("PySide6.QtWidgets", reason="Qt libraries unavailable")
+        pytest.importorskip(
+            "PySide6.QtWidgets", reason="Qt libraries unavailable", exc_type=ImportError
+        )
         import pdf_batch_separator
 
         broken = []
@@ -193,7 +231,9 @@ class TestExcludesAreSafe:
     """The excludes list must not contain anything the app really uses."""
 
     def test_excluded_modules_are_not_used_by_a_full_run(self, workdir, outdir):
-        pytest.importorskip("PySide6.QtWidgets", reason="Qt libraries unavailable")
+        pytest.importorskip(
+            "PySide6.QtWidgets", reason="Qt libraries unavailable", exc_type=ImportError
+        )
 
         from fixtures.builders import add_blank_page, add_separator_page, add_text_page, build_pdf
         from pdf_batch_separator.core.analyzer import analyze_document

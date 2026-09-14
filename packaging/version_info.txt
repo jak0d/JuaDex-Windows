@@ -4,8 +4,8 @@
 # Keep the numbers in sync with pdf_batch_separator.__version__.
 VSVersionInfo(
   ffi=FixedFileInfo(
-    filevers=(1, 0, 0, 0),
-    prodvers=(1, 0, 0, 0),
+    filevers=(1, 0, 1, 0),
+    prodvers=(1, 0, 1, 0),
     mask=0x3f,
     flags=0x0,
     OS=0x40004,
@@ -19,14 +19,14 @@ VSVersionInfo(
         StringTable(
           '040904B0',
           [
-            StringStruct('CompanyName', 'JuaDex contributors'),
+            StringStruct('CompanyName', 'jak0d'),
             StringStruct('FileDescription', 'JuaDex PDFs Separator'),
-            StringStruct('FileVersion', '1.0.0.0'),
+            StringStruct('FileVersion', '1.0.1.0'),
             StringStruct('InternalName', 'JuaDex PDFs Separator'),
-            StringStruct('LegalCopyright', 'MIT licensed. See THIRD_PARTY_NOTICES.md.'),
+            StringStruct('LegalCopyright', 'Copyright (c) 2026 jak0d. See third-party notices.'),
             StringStruct('OriginalFilename', 'JuaDex PDFs Separator.exe'),
             StringStruct('ProductName', 'JuaDex PDFs Separator'),
-            StringStruct('ProductVersion', '1.0.0.0')
+            StringStruct('ProductVersion', '1.0.1.0')
           ]
         )
       ]

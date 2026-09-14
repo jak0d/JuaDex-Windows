@@ -8,8 +8,8 @@
 ; The result is installer_output\JuaDex-PDFs-Separator-<version>-Setup.exe
 
 #define MyAppName "JuaDex PDFs Separator"
-#define MyAppVersion "1.0.0"
-#define MyAppPublisher "JuaDex contributors"
+#define MyAppVersion "1.0.1"
+#define MyAppPublisher "jak0d"
 #define MyAppExeName "JuaDex PDFs Separator.exe"
 #define MyAppId "{{B4E8A0F3-9C2D-4E77-9B1A-5F3D7C6E8A21}"
 
@@ -61,6 +61,8 @@ Source: "..\dist\{#MyAppName}\*"; DestDir: "{app}"; \
 Source: "..\THIRD_PARTY_NOTICES.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\PRIVACY.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\LICENSES\*"; DestDir: "{app}\LICENSES"; \
+    Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"

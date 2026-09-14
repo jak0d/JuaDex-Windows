@@ -1,0 +1,53 @@
+name: Security and tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      QT_QPA_PLATFORM: offscreen
+    steps:
+      - name: Check out source
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - name: Set up Python 3.12
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install Qt runtime libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y libegl1 libgl1 libxkbcommon-x11-0
+      - name: Install project and audit tool
+        run: |
+          python -m pip install --disable-pip-version-check -e ".[dev]"
+          python -m pip install --disable-pip-version-check pip-audit==2.10.1
+          python -m pip check
+      - name: Audit Python dependencies
+        run: python -m pip_audit
+      - name: Run tests
+        run: python -m pytest -q
+      - name: Check committed legal texts are complete
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          minimums = {
+              "AGPL-3.0.txt": 20_000,
+              "GPL-3.0.txt": 20_000,
+              "LGPL-3.0.txt": 5_000,
+              "Apache-2.0.txt": 8_000,
+              "Lucide-ISC.txt": 500,
+          }
+          for name, minimum in minimums.items():
+              size = (Path("LICENSES") / name).stat().st_size
+              assert size >= minimum, f"{name} appears incomplete ({size} bytes)"
+          PY

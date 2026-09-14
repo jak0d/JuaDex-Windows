@@ -26,8 +26,8 @@ $ProjectRoot = Split-Path -Parent $PSScriptRoot
 Set-Location $ProjectRoot
 
 $AppName = "JuaDex PDFs Separator"
-$Version = "1.0.0"
-$TimestampUrl = "http://timestamp.digicert.com"
+$Version = "1.0.1"
+$TimestampUrl = "https://timestamp.digicert.com"
 
 function Write-Step($message) {
     Write-Host ""
@@ -50,18 +50,23 @@ if ($pyVersion.Trim() -ne "3.12") {
 }
 
 # --- dependencies ----------------------------------------------------------
-Write-Step "Installing dependencies"
-& python -m pip install --upgrade pip
-& python -m pip install -e ".[dev,build]"
+Write-Step "Installing exactly pinned release dependencies"
+& python -m pip install -r packaging\requirements-release.txt
+if ($LASTEXITCODE -ne 0) { throw "Installing release dependencies failed." }
+& python -m pip install -e . --no-deps
+if ($LASTEXITCODE -ne 0) { throw "Installing JuaDex failed." }
+& python -m pip check
+if ($LASTEXITCODE -ne 0) { throw "The release environment has dependency conflicts." }
+
+# --- licences --------------------------------------------------------------
+Write-Step "Validating dependency licences"
+& python packaging\collect_licenses.py
+if ($LASTEXITCODE -ne 0) { throw "Licence validation failed; aborting the build." }
 
 # --- tests -----------------------------------------------------------------
 Write-Step "Running the test suite"
 & python -m pytest -q
 if ($LASTEXITCODE -ne 0) { throw "Tests failed; aborting the build." }
-
-# --- licences --------------------------------------------------------------
-Write-Step "Collecting dependency licences"
-& python packaging\collect_licenses.py
 
 # --- clean -----------------------------------------------------------------
 Write-Step "Cleaning previous build output"
@@ -76,7 +81,18 @@ if ($LASTEXITCODE -ne 0) { throw "PyInstaller failed." }
 
 $exePath = Join-Path "dist\$AppName" "$AppName.exe"
 if (-not (Test-Path $exePath)) { throw "Expected executable not found: $exePath" }
-Write-Host "Built $exePath"
+$requiredBundledFiles = @(
+    "LICENSE",
+    "THIRD_PARTY_NOTICES.md",
+    "LICENSES\AGPL-3.0.txt",
+    "LICENSES\GPL-3.0.txt",
+    "LICENSES\LGPL-3.0.txt"
+)
+foreach ($relative in $requiredBundledFiles) {
+    $bundled = Join-Path "dist\$AppName" $relative
+    if (-not (Test-Path $bundled)) { throw "Required legal file was not bundled: $bundled" }
+}
+Write-Host "Built $exePath with required legal notices"
 
 # --- smoke test ------------------------------------------------------------
 Write-Step "Smoke-testing the packaged application"
