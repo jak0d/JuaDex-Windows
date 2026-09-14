@@ -8,6 +8,6 @@ zxing-cpp==2.3.0
 numpy==2.4.6
 Pillow==12.3.0
 pyinstaller==6.22.3
-pytest==9.0.3
+pytest==9.1.1
 pytest-qt==4.5.0
 pytest-timeout==2.4.0
