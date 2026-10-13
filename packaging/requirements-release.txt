@@ -2,7 +2,7 @@
 # Update this file deliberately, run the full test suite and regenerate the
 # dependency licence inventory before publishing a release.
 PyMuPDF==1.28.2
-PySide6-Essentials==6.11.2
+PySide6-Essentials==6.12.0
 shiboken6==6.11.2
 zxing-cpp==2.3.0
 numpy==2.4.6
